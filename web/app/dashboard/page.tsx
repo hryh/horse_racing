@@ -107,7 +107,7 @@ function RaceChart({ race }: { race: Race }) {
               contentStyle={tooltipStyle} labelStyle={{ color: "#f9fafb" }} />
             <Bar dataKey="prob" radius={[0, 4, 4, 0]}
               label={{ position: "right", fill: "#9ca3af", fontSize: 11,
-                formatter: (v: number) => `${v}%` }}>
+                formatter: (v: unknown) => `${v}%` }}>
               {probData.map((e, i) => (
                 <Cell key={i} fill={e.isBest ? "#16a34a" : "#3b82f6"} fillOpacity={0.85} />
               ))}
@@ -135,7 +135,7 @@ function RaceChart({ race }: { race: Race }) {
                 contentStyle={tooltipStyle} labelStyle={{ color: "#f9fafb" }} />
               <Bar dataKey="ev" radius={[0, 4, 4, 0]}
                 label={{ position: "right", fill: "#9ca3af", fontSize: 11,
-                  formatter: (v: number) => v >= 0 ? `+${v.toFixed(2)}` : v.toFixed(2) }}>
+                  formatter: (v: unknown) => typeof v === "number" ? (v >= 0 ? `+${v.toFixed(2)}` : v.toFixed(2)) : "" }}>
                 {evData.map((e, i) => (
                   <Cell key={i} fill={e.ev > 0 ? "#16a34a" : "#ef4444"} fillOpacity={0.85} />
                 ))}
