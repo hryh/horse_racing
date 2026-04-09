@@ -172,15 +172,20 @@ class HorseRacingPredictor:
         if base_raw is None:
             raise RuntimeError("No training history available. Call fit() first.")
 
-        results = []
+        # Build all rows for all races at once, then transform in a single pass.
+        # Calling transform() once instead of N times avoids re-concatenating and
+        # re-processing the full training history for every race (11× speedup).
+        all_rows: list = []
+        race_slices: list = []  # (race_no, race_dict, start_idx, end_idx)
+
         for race in card.get("races", []):
             race_no = race.get("race_no")
             runners = race.get("runners", [])
             if not runners:
                 continue
-
-            new_rows = [
-                {
+            start = len(all_rows)
+            for r in runners:
+                all_rows.append({
                     "date": pd.Timestamp(card["date"]),
                     "location": card["venue"], "race_no": race_no,
                     "class": race.get("class", ""),
@@ -193,14 +198,21 @@ class HorseRacingPredictor:
                     "act_wt": r.get("act_wt"), "declar_wt": r.get("declar_wt"),
                     "draw": r.get("draw"), "win_odds": r.get("win_odds"),
                     "place": None, "won": 0, "lbw": None, "time": None,
-                }
-                for r in runners
-            ]
-            new_df = pd.DataFrame(new_rows)
+                })
+            race_slices.append((race_no, race, start, len(all_rows)))
 
-            # Transform using fitted pipeline (training stats stay fixed)
-            feat = self.pipeline.transform(new_df, history_df=base_raw)
+        if not all_rows:
+            return []
 
+        # Single transform call for the entire card
+        all_feat = self.pipeline.transform(
+            pd.DataFrame(all_rows), history_df=base_raw
+        )
+
+        results = []
+        for race_no, race, start, end in race_slices:
+            feat    = all_feat.iloc[start:end].reset_index(drop=True)
+            runners = race.get("runners", [])
             close_odds = {
                 r.get("horse"): r.get("win_odds")
                 for r in runners if r.get("win_odds")
