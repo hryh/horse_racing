@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 
+export const maxDuration = 60
+
 export async function GET() {
   const renderUrl = process.env.RENDER_API_URL
   if (!renderUrl) {
@@ -7,7 +9,7 @@ export async function GET() {
   }
   try {
     const res = await fetch(`${renderUrl}/next-meeting`, {
-      signal: AbortSignal.timeout(90_000),  // 90s — enough for Render to wake
+      signal: AbortSignal.timeout(55_000),
       cache: "no-store",
     })
     return NextResponse.json(await res.json(), { status: res.status })
