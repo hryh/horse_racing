@@ -35,7 +35,7 @@ interface PredictionResult {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-const API = ""
+const API = "/api"
 
 async function apiFetch(path: string) {
   const res = await fetch(API + path)
