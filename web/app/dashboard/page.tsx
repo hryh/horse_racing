@@ -236,6 +236,7 @@ export default function Dashboard() {
   const [venue, setVenue] = useState("ST")
   const [result, setResult] = useState<PredictionResult | null>(null)
   const [loading, setLoading] = useState(false)
+  const [status, setStatus] = useState("")
   const [error, setError] = useState("")
   const [lastFetched, setLastFetched] = useState<string | null>(null)
 
@@ -255,6 +256,28 @@ export default function Dashboard() {
     if (!meetingDate) return
     setLoading(true)
     setError("")
+    setStatus("Waking up prediction server…")
+
+    // Poll /api/wake until Render is ready (cold start can take 60-90s)
+    let ready = false
+    for (let i = 0; i < 24 && !ready; i++) {
+      try {
+        const res = await fetch("/api/wake")
+        const data = await res.json()
+        if (data.ready) { ready = true; break }
+      } catch {}
+      setStatus(`Server warming up… ${(i + 1) * 5}s elapsed (may take up to 90s)`)
+      await new Promise(r => setTimeout(r, 5000))
+    }
+
+    if (!ready) {
+      setError("Server failed to wake up. Please try again in a minute.")
+      setLoading(false)
+      setStatus("")
+      return
+    }
+
+    setStatus("Server ready — fetching predictions…")
     try {
       const data: PredictionResult = await apiFetch(
         `/predict?meeting_date=${meetingDate}&venue=${venue}`
@@ -265,6 +288,7 @@ export default function Dashboard() {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoading(false)
+      setStatus("")
     }
   }, [meetingDate, venue])
 
@@ -311,7 +335,7 @@ export default function Dashboard() {
           >
             {loading ? (
               <>
-                <span className="animate-spin text-base">⟳</span> Fetching…
+                <span className="animate-spin text-base">⟳</span> {status || "Fetching…"}
               </>
             ) : (
               <>⟳ Fetch Predictions</>

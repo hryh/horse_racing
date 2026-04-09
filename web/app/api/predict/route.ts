@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
+export const maxDuration = 60
+
 export async function GET(request: NextRequest) {
   const renderUrl = process.env.RENDER_API_URL
   if (!renderUrl) {
@@ -8,7 +10,7 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams.toString()
   try {
     const res = await fetch(`${renderUrl}/predict?${params}`, {
-      signal: AbortSignal.timeout(90_000),  // 90s — enough for Render to wake
+      signal: AbortSignal.timeout(55_000),
       cache: "no-store",
     })
     return NextResponse.json(await res.json(), { status: res.status })
