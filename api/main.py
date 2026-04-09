@@ -137,8 +137,11 @@ def predict(meeting_date: str, venue: str = "ST"):
             raw_odds = ru.get("win_odds")          # None if not yet published
             horses.append({
                 "name":           dec.horse_name,
+                "name_ch":        ru.get("horse_ch"),
                 "draw":           ru.get("draw"),
                 "jockey":         ru.get("jockey"),
+                "jockey_ch":      ru.get("jockey_ch"),
+                "trainer_ch":     ru.get("trainer_ch"),
                 "win_prob":       round(dec.win_prob, 4),
                 "win_odds":       raw_odds,          # null when unpublished
                 "expected_value": round(dec.expected_value, 4) if raw_odds else None,

@@ -261,9 +261,12 @@ def _parse_meeting(meeting: dict, race_date: str, venue: str) -> dict:
             runners.append({
                 "horse_no":   r.get("no"),
                 "horse":      r.get("name_en"),
+                "horse_ch":   r.get("name_ch"),
                 "horse_id":   (r.get("horse") or {}).get("code"),
                 "jockey":     (r.get("jockey") or {}).get("code"),
+                "jockey_ch":  (r.get("jockey") or {}).get("name_ch"),
                 "trainer":    (r.get("trainer") or {}).get("code"),
+                "trainer_ch": (r.get("trainer") or {}).get("name_ch"),
                 "draw":       _safe_int(r.get("barrierDrawNumber")),
                 "declar_wt":  _safe_float(r.get("handicapWeight")),
                 "act_wt":     _safe_float(r.get("currentWeight")),
