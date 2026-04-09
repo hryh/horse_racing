@@ -35,7 +35,7 @@ interface PredictionResult {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? ""
+const API = ""
 
 async function apiFetch(path: string) {
   const res = await fetch(API + path)
