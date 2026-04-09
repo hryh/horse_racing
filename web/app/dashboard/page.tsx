@@ -103,7 +103,7 @@ function RaceChart({ race }: { race: Race }) {
               tickFormatter={v => `${v}%`} />
             <YAxis type="category" dataKey="name" width={95}
               tick={{ fill: "#d1d5db", fontSize: 12 }} />
-            <Tooltip formatter={(v: number) => [`${v}%`, "Win Prob"]}
+            <Tooltip formatter={(v) => [`${v}%`, "Win Prob"]}
               contentStyle={tooltipStyle} labelStyle={{ color: "#f9fafb" }} />
             <Bar dataKey="prob" radius={[0, 4, 4, 0]}
               label={{ position: "right", fill: "#9ca3af", fontSize: 11,
@@ -131,7 +131,7 @@ function RaceChart({ race }: { race: Race }) {
                 tick={{ fill: "#d1d5db", fontSize: 12 }} />
               <ReferenceLine x={0} stroke="#4b5563" />
               <Tooltip
-                formatter={(v: number) => [v >= 0 ? `+${v.toFixed(3)}` : v.toFixed(3), "EV"]}
+                formatter={(v) => [typeof v === "number" ? (v >= 0 ? `+${v.toFixed(3)}` : v.toFixed(3)) : v, "EV"]}
                 contentStyle={tooltipStyle} labelStyle={{ color: "#f9fafb" }} />
               <Bar dataKey="ev" radius={[0, 4, 4, 0]}
                 label={{ position: "right", fill: "#9ca3af", fontSize: 11,
