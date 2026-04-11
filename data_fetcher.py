@@ -189,6 +189,47 @@ query raceMeetings($date: String, $venueCode: String) {
 
 RACE_DATE_FMT = "%Y-%m-%d"
 
+# Live WIN-odds query extracted from bet.hkjc.com bundle (main.1dd5c98e.js)
+# Omitting raceNo returns all races in one call.
+_LIVE_ODDS_QUERY = """
+      query racing($date: String, $venueCode: String, $oddsTypes: [OddsType], $raceNo: Int) {
+          raceMeetings(date: $date, venueCode: $venueCode)
+          {
+            pmPools(oddsTypes: $oddsTypes, raceNo: $raceNo) {
+              id
+              status
+              sellStatus
+              oddsType
+              lastUpdateTime
+              guarantee
+              minTicketCost
+              name_en
+              name_ch
+              leg {
+                number
+                races
+              }
+              cWinSelections {
+                composite
+                name_ch
+                name_en
+                starters
+              }
+              oddsNodes {
+                combString
+                oddsValue
+                hotFavourite
+                oddsDropValue
+                bankerOdds {
+                  combString
+                  oddsValue
+                }
+              }
+            }
+          }
+      }
+"""
+
 
 # ---------------------------------------------------------------------------
 # GraphQL helper
@@ -210,6 +251,52 @@ def _gql(query: str, variables: Optional[dict] = None) -> dict:
 # Live API helpers
 # ---------------------------------------------------------------------------
 
+def get_live_win_odds(race_date: str, venue: str) -> dict:
+    """
+    Fetch live WIN pool odds for all races using the dedicated 'racing' query.
+
+    Returns: {race_no (int): {runner_no (int): odds (float)}}
+    Returns empty dict on any error so the caller can still show probabilities.
+    """
+    try:
+        resp = requests.post(
+            GRAPHQL_URL,
+            json={
+                "query": _LIVE_ODDS_QUERY,
+                "variables": {"date": race_date, "venueCode": venue, "oddsTypes": ["WIN"]},
+            },
+            headers=HEADERS,
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        meetings = (data.get("data") or {}).get("raceMeetings") or []
+        if not meetings:
+            return {}
+        pools = meetings[0].get("pmPools") or []
+        result: dict = {}
+        for pool in pools:
+            if pool.get("oddsType") != "WIN":
+                continue
+            race_no_list = (pool.get("leg") or {}).get("races") or []
+            if not race_no_list:
+                continue
+            race_no = int(race_no_list[0])
+            runner_odds: dict = {}
+            for node in (pool.get("oddsNodes") or []):
+                try:
+                    rno = int(node["combString"])
+                    val = _safe_float(node.get("oddsValue"))
+                    if val and val > 0:
+                        runner_odds[rno] = val
+                except (TypeError, ValueError, KeyError):
+                    continue
+            result[race_no] = runner_odds
+        return result
+    except Exception:
+        return {}
+
+
 def get_race_card(race_date: Optional[str] = None, venue: str = "HV") -> dict:
     """
     Fetch the full race card (runners + current odds) for a given date/venue.
@@ -227,7 +314,25 @@ def get_race_card(race_date: Optional[str] = None, venue: str = "HV") -> dict:
     if not meetings:
         return {"date": race_date, "venue": venue, "races": []}
 
-    return _parse_meeting(meetings[0], race_date, venue)
+    card = _parse_meeting(meetings[0], race_date, venue)
+
+    # Overlay live WIN odds (separate 'racing' query — populated during betting)
+    live_odds = get_live_win_odds(race_date, venue)
+    if live_odds:
+        for race in card["races"]:
+            race_no = race.get("race_no")
+            runner_odds = live_odds.get(race_no) or {}
+            for runner in race.get("runners", []):
+                horse_no = runner.get("horse_no")
+                try:
+                    rno = int(horse_no)
+                except (TypeError, ValueError):
+                    continue
+                live = runner_odds.get(rno)
+                if live:
+                    runner["win_odds"] = live
+
+    return card
 
 
 def get_results(race_date: str, venue: str = "HV") -> pd.DataFrame:
