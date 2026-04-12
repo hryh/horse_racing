@@ -32,6 +32,133 @@ from .models   import DNNModel, PatternModel
 from .strategy import KellyCriterion, BetDecision
 
 
+# ---------------------------------------------------------------------------
+# Harville QPL helpers
+# ---------------------------------------------------------------------------
+
+def _harville_qpl_prob(p: np.ndarray, i: int, j: int) -> float:
+    """
+    Compute P(horse i AND horse j both finish in top 3) using the Harville model.
+
+    p: array of win probabilities (already normalized, sum = 1)
+    i, j: 0-based indices of the two horses
+    """
+    n = len(p)
+    others = [k for k in range(n) if k != i and k != j]
+
+    pi, pj = float(p[i]), float(p[j])
+    if pi <= 0 or pj <= 0:
+        return 0.0
+
+    total = 0.0
+
+    # (i=1st, j=2nd)
+    total += pi * pj / (1 - pi)
+
+    # (j=1st, i=2nd)
+    total += pj * pi / (1 - pj)
+
+    for k in others:
+        pk = float(p[k])
+        if pk <= 0:
+            continue
+        denom_k = 1 - pk
+
+        # (i=1st, j=3rd): i 1st, k 2nd, j 3rd
+        dik = 1 - pi - pk
+        if dik > 0:
+            total += pi * (pk / (1 - pi)) * (pj / dik)
+
+        # (j=1st, i=3rd): j 1st, k 2nd, i 3rd
+        djk = 1 - pj - pk
+        if djk > 0:
+            total += pj * (pk / (1 - pj)) * (pi / djk)
+
+        # (k=1st, i=2nd, j=3rd)
+        dki = 1 - pk - pi
+        if denom_k > 0 and dki > 0:
+            total += pk * (pi / denom_k) * (pj / dki)
+
+        # (k=1st, j=2nd, i=3rd)
+        dkj = 1 - pk - pj
+        if denom_k > 0 and dkj > 0:
+            total += pk * (pj / denom_k) * (pi / dkj)
+
+    return min(total, 1.0)
+
+
+def compute_qpl_bets(
+    decisions: List[BetDecision],
+    kelly: KellyCriterion,
+    qpl_market_odds: Optional[Dict] = None,
+    top_n: int = 3,
+) -> List[dict]:
+    """
+    Compute QPL pair recommendations for a race.
+
+    decisions: sorted list of BetDecision from predict_race_df()
+    kelly: KellyCriterion instance for bet sizing
+    qpl_market_odds: {(runner_no_a, runner_no_b): market_odds} — optional
+    top_n: how many pairs to return
+
+    Returns list of dicts, best first.
+    """
+    probs = np.array([d.win_prob for d in decisions])
+    if probs.sum() <= 0:
+        return []
+    probs = probs / probs.sum()
+
+    n = len(decisions)
+    results = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            qpl_prob = _harville_qpl_prob(probs, i, j)
+
+            horse_a = decisions[i]
+            horse_b = decisions[j]
+
+            # Try to get market odds for EV calculation
+            mkt_odds = None
+            if qpl_market_odds:
+                # Runner numbers are 1-based draw positions; try both orderings
+                try:
+                    na = int(horse_a.horse_idx) + 1
+                    nb = int(horse_b.horse_idx) + 1
+                    key = (min(na, nb), max(na, nb))
+                    mkt_odds = qpl_market_odds.get(key)
+                except (TypeError, ValueError):
+                    pass
+
+            ev = None
+            bet_fraction = 0.0
+            should_bet = False
+            if mkt_odds and mkt_odds > 0:
+                ev = round(qpl_prob * mkt_odds - 1, 4)
+                if ev > kelly.min_edge:
+                    # Kelly fraction for QPL
+                    raw_kelly = ev / (mkt_odds - 1) if mkt_odds > 1 else 0
+                    bet_fraction = min(raw_kelly * kelly.fractional_kelly, kelly.max_fraction)
+                    should_bet = bet_fraction > 0
+
+            results.append({
+                "horse_a":     horse_a.horse_name,
+                "horse_b":     horse_b.horse_name,
+                "qpl_prob":    round(qpl_prob, 4),
+                "market_odds": mkt_odds,
+                "ev":          ev,
+                "should_bet":  should_bet,
+                "bet_fraction": round(bet_fraction * 100, 2) if should_bet else None,
+            })
+
+    # Sort: if market odds available, sort by EV desc; otherwise by probability desc
+    if qpl_market_odds:
+        results.sort(key=lambda x: (x["ev"] or -99), reverse=True)
+    else:
+        results.sort(key=lambda x: x["qpl_prob"], reverse=True)
+
+    return results[:top_n]
+
+
 class HorseRacingPredictor:
     """
     Ensemble predictor:  final_prob = dnn_weight * P_dnn + pattern_weight * P_pattern

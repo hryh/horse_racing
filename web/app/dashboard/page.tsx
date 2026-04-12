@@ -23,6 +23,16 @@ interface Horse {
   bet_fraction: number | null  // % of bankroll already multiplied by 100
 }
 
+interface QplBet {
+  horse_a: string
+  horse_b: string
+  qpl_prob: number
+  market_odds: number | null
+  ev: number | null
+  should_bet: boolean
+  bet_fraction: number | null
+}
+
 interface Race {
   race_no: number
   race_class: string
@@ -31,6 +41,7 @@ interface Race {
   course: string
   horses: Horse[]
   best_bet: string | null
+  qpl_bets: QplBet[]
 }
 
 interface PredictionResult {
@@ -348,6 +359,63 @@ function RaceCard({ race }: { race: Race }) {
           Odds not yet published — probabilities only. Re-fetch once HKJC posts odds.
         </div>
       )}
+
+      {/* QPL section */}
+      {race.qpl_bets && race.qpl_bets.length > 0 && (
+        <div className="border-t border-gray-800 px-4 py-3">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-semibold text-purple-400 uppercase tracking-wide">
+              Quinella Place
+            </span>
+            {!race.qpl_bets[0].market_odds && (
+              <span className="text-xs text-gray-500 italic">
+                (Ranked by Harville probability — market odds not yet available)
+              </span>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            {race.qpl_bets.map((qb, i) => (
+              <div
+                key={i}
+                className={[
+                  "flex items-center justify-between rounded-lg px-3 py-2 text-sm",
+                  qb.should_bet
+                    ? "bg-purple-950/50 border border-purple-800/50"
+                    : "bg-gray-800/40",
+                ].join(" ")}
+              >
+                <div className="flex items-center gap-2">
+                  {qb.should_bet && <span className="text-purple-400 text-xs">★</span>}
+                  <span className="font-medium text-white">{qb.horse_a}</span>
+                  <span className="text-gray-500 text-xs">+</span>
+                  <span className="font-medium text-white">{qb.horse_b}</span>
+                </div>
+                <div className="flex items-center gap-4 text-xs font-mono">
+                  <span className="text-gray-400">
+                    {(qb.qpl_prob * 100).toFixed(1)}%
+                  </span>
+                  {qb.market_odds != null && (
+                    <span className="text-gray-300">@{qb.market_odds.toFixed(1)}</span>
+                  )}
+                  {qb.ev != null && (
+                    <span className={qb.ev >= 0 ? "text-green-400" : "text-red-400"}>
+                      EV {qb.ev >= 0 ? "+" : ""}{qb.ev.toFixed(3)}
+                    </span>
+                  )}
+                  {qb.should_bet && qb.bet_fraction != null && (
+                    <span className="bg-purple-600 text-white px-2 py-0.5 rounded font-bold">
+                      {qb.bet_fraction.toFixed(1)}% bankroll
+                    </span>
+                  )}
+                  {!qb.should_bet && qb.market_odds != null && (
+                    <span className="text-gray-600">—</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -423,6 +491,7 @@ export default function Dashboard() {
   }
 
   const betsTotal = result?.races.filter((r) => r.best_bet !== null).length ?? 0
+  const qplTotal = result?.races.reduce((acc, r) => acc + (r.qpl_bets?.filter(q => q.should_bet).length ?? 0), 0) ?? 0
   const oddsReady = result?.races.some((r) =>
     r.horses.some((h) => h.win_odds !== null)
   ) ?? false
@@ -499,9 +568,15 @@ export default function Dashboard() {
               <span className="text-white font-semibold">{result.races.length}</span>
             </div>
             <div>
-              <span className="text-gray-400">Recommended bets </span>
+              <span className="text-gray-400">Win bets </span>
               <span className={betsTotal > 0 ? "text-green-400 font-semibold" : "text-gray-400"}>
                 {betsTotal}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-400">QPL bets </span>
+              <span className={qplTotal > 0 ? "text-purple-400 font-semibold" : "text-gray-400"}>
+                {qplTotal > 0 ? qplTotal : "—"}
               </span>
             </div>
             {!oddsReady && (

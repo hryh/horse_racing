@@ -251,50 +251,88 @@ def _gql(query: str, variables: Optional[dict] = None) -> dict:
 # Live API helpers
 # ---------------------------------------------------------------------------
 
-def get_live_win_odds(race_date: str, venue: str) -> dict:
+def _fetch_pool_odds(race_date: str, venue: str, odds_types: list) -> list:
     """
-    Fetch live WIN pool odds for all races using the dedicated 'racing' query.
-
-    Returns: {race_no (int): {runner_no (int): odds (float)}}
-    Returns empty dict on any error so the caller can still show probabilities.
+    Call the whitelisted 'racing' query and return pmPools list.
+    Returns [] on any error (whitelist block, timeout, etc.).
     """
     try:
         resp = requests.post(
             GRAPHQL_URL,
             json={
                 "query": _LIVE_ODDS_QUERY,
-                "variables": {"date": race_date, "venueCode": venue, "oddsTypes": ["WIN"]},
+                "variables": {"date": race_date, "venueCode": venue, "oddsTypes": odds_types},
             },
             headers=HEADERS,
             timeout=15,
         )
         resp.raise_for_status()
         data = resp.json()
+        if data.get("errors"):
+            return []
         meetings = (data.get("data") or {}).get("raceMeetings") or []
-        if not meetings:
-            return {}
-        pools = meetings[0].get("pmPools") or []
-        result: dict = {}
-        for pool in pools:
-            if pool.get("oddsType") != "WIN":
-                continue
-            race_no_list = (pool.get("leg") or {}).get("races") or []
-            if not race_no_list:
-                continue
-            race_no = int(race_no_list[0])
-            runner_odds: dict = {}
-            for node in (pool.get("oddsNodes") or []):
-                try:
-                    rno = int(node["combString"])
-                    val = _safe_float(node.get("oddsValue"))
-                    if val and val > 0:
-                        runner_odds[rno] = val
-                except (TypeError, ValueError, KeyError):
-                    continue
-            result[race_no] = runner_odds
-        return result
+        return (meetings[0].get("pmPools") or []) if meetings else []
     except Exception:
-        return {}
+        return []
+
+
+def get_live_win_odds(race_date: str, venue: str) -> dict:
+    """
+    Fetch live WIN pool odds for all races.
+    Returns: {race_no (int): {runner_no (int): odds (float)}}
+    """
+    pools = _fetch_pool_odds(race_date, venue, ["WIN"])
+    result: dict = {}
+    for pool in pools:
+        if pool.get("oddsType") != "WIN":
+            continue
+        race_no_list = (pool.get("leg") or {}).get("races") or []
+        if not race_no_list:
+            continue
+        race_no = int(race_no_list[0])
+        runner_odds: dict = {}
+        for node in (pool.get("oddsNodes") or []):
+            try:
+                rno = int(node["combString"])
+                val = _safe_float(node.get("oddsValue"))
+                if val and val > 0:
+                    runner_odds[rno] = val
+            except (TypeError, ValueError, KeyError):
+                continue
+        result[race_no] = runner_odds
+    return result
+
+
+def get_live_qpl_odds(race_date: str, venue: str) -> dict:
+    """
+    Fetch live QPL pool odds for all races.
+    Returns: {race_no (int): {(a, b) (tuple[int,int]): odds (float)}}
+    where a < b are runner numbers.
+    Returns empty dict if QPL is not yet available (pre-betting, whitelist block).
+    """
+    pools = _fetch_pool_odds(race_date, venue, ["QPL"])
+    result: dict = {}
+    for pool in pools:
+        if pool.get("oddsType") != "QPL":
+            continue
+        race_no_list = (pool.get("leg") or {}).get("races") or []
+        if not race_no_list:
+            continue
+        race_no = int(race_no_list[0])
+        pair_odds: dict = {}
+        for node in (pool.get("oddsNodes") or []):
+            try:
+                parts = [int(x) for x in node["combString"].split(",")]
+                if len(parts) != 2:
+                    continue
+                a, b = sorted(parts)
+                val = _safe_float(node.get("oddsValue"))
+                if val and val > 0:
+                    pair_odds[(a, b)] = val
+            except (TypeError, ValueError, KeyError):
+                continue
+        result[race_no] = pair_odds
+    return result
 
 
 def get_race_card(race_date: Optional[str] = None, venue: str = "HV") -> dict:

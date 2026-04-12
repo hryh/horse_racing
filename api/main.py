@@ -30,8 +30,8 @@ if "horse_racing" not in sys.modules:
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from horse_racing.predictor import HorseRacingPredictor
-from horse_racing.data_fetcher import get_race_card
+from horse_racing.predictor import HorseRacingPredictor, compute_qpl_bets
+from horse_racing.data_fetcher import get_race_card, get_live_qpl_odds
 
 MODELS_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models"
@@ -120,6 +120,9 @@ def predict(meeting_date: str, venue: str = "ST"):
 
     results = _predictor.predict_card(card)
 
+    # Fetch live QPL market odds (available during betting window only)
+    live_qpl = get_live_qpl_odds(meeting_date, venue)
+
     # Build a runner lookup keyed by horse name for each race
     card_by_race = {r["race_no"]: r for r in card["races"]}
 
@@ -149,6 +152,15 @@ def predict(meeting_date: str, venue: str = "ST"):
                 "bet_fraction":   round(dec.bet_fraction * 100, 2) if raw_odds else None,
             })
 
+        # QPL bets via Harville formula + optional market odds
+        qpl_market = live_qpl.get(rno)
+        qpl_bets = compute_qpl_bets(
+            result["decisions"],
+            _predictor.kelly,
+            qpl_market_odds=qpl_market,
+            top_n=3,
+        )
+
         output_races.append({
             "race_no":     rno,
             "race_class":  card_race.get("class", ""),
@@ -157,6 +169,7 @@ def predict(meeting_date: str, venue: str = "ST"):
             "course":      card_race.get("course", ""),
             "horses":      horses,
             "best_bet":    result["best_bet"].horse_name if result["best_bet"] else None,
+            "qpl_bets":    qpl_bets,
         })
 
     return {"date": meeting_date, "venue": venue, "races": output_races}
