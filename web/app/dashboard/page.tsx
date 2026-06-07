@@ -1,11 +1,16 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
   ResponsiveContainer, ReferenceLine,
 } from "recharts"
+import {
+  TrophyIcon, StarFilledIcon, ChartIcon, TableIcon, AlertIcon,
+  RefreshIcon, LogoutIcon, CalendarIcon, FilterIcon, CheckIcon,
+  TargetIcon, LayersIcon, SpinnerIcon,
+} from "../components/icons"
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -51,9 +56,23 @@ interface PredictionResult {
   message?: string
 }
 
+type SortKey = "model" | "win" | "ev"
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const API = "/api"
+
+// Chart / accent palette (matches globals.css tokens)
+const C = {
+  accent: "#2ee6a6",
+  accentDim: "#14c98b",
+  info: "#5b9dff",
+  purple: "#b78cff",
+  danger: "#ff6b6b",
+  grid: "#232834",
+  axis: "#646d7c",
+  axisLabel: "#9aa3b2",
+}
 
 async function apiFetch(path: string) {
   const res = await fetch(API + path)
@@ -69,9 +88,9 @@ function pct(v: number) {
 }
 
 function evColor(ev: number | null) {
-  if (ev === null) return "text-gray-400"
-  if (ev > 0) return "text-green-400"
-  return "text-red-400"
+  if (ev === null) return "text-ink-dim"
+  if (ev > 0) return "text-accent"
+  return "text-danger"
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────
@@ -95,14 +114,15 @@ function RaceChart({ race }: { race: Race }) {
     }))
 
   const tooltipStyle = {
-    background: "#111827", border: "1px solid #374151", borderRadius: 8,
+    background: "#0d1016", border: "1px solid #232834", borderRadius: 10,
+    boxShadow: "0 12px 30px -12px rgba(0,0,0,0.6)",
   }
 
   return (
-    <div className="px-4 pt-3 pb-5 space-y-6 border-t border-gray-800 bg-gray-950/40">
+    <div className="px-4 pt-4 pb-5 space-y-6 border-t border-line-soft bg-bg/40">
       {/* Win Probability */}
       <div>
-        <p className="text-xs text-gray-400 uppercase tracking-wide mb-3 font-medium">
+        <p className="text-[11px] text-ink-muted uppercase tracking-wider mb-3 font-semibold">
           Win Probability
         </p>
         <ResponsiveContainer width="100%" height={chartH}>
@@ -110,17 +130,18 @@ function RaceChart({ race }: { race: Race }) {
             margin={{ left: 0, right: 52, top: 2, bottom: 0 }}>
             <XAxis type="number"
               domain={[0, Math.max(...probData.map(d => d.prob)) * 1.2]}
-              tick={{ fill: "#6b7280", fontSize: 10 }}
+              tick={{ fill: C.axis, fontSize: 10 }}
               tickFormatter={v => `${v}%`} />
             <YAxis type="category" dataKey="name" width={95}
-              tick={{ fill: "#d1d5db", fontSize: 12 }} />
+              tick={{ fill: C.axisLabel, fontSize: 12 }} />
             <Tooltip formatter={(v) => [`${v}%`, "Win Prob"]}
-              contentStyle={tooltipStyle} labelStyle={{ color: "#f9fafb" }} />
+              contentStyle={tooltipStyle} labelStyle={{ color: "#e8eaed" }}
+              cursor={{ fill: "rgba(255,255,255,0.03)" }} />
             <Bar dataKey="prob" radius={[0, 4, 4, 0]}
-              label={{ position: "right", fill: "#9ca3af", fontSize: 11,
+              label={{ position: "right", fill: C.axisLabel, fontSize: 11,
                 formatter: (v: unknown) => `${v}%` }}>
               {probData.map((e, i) => (
-                <Cell key={i} fill={e.isBest ? "#16a34a" : "#3b82f6"} fillOpacity={0.85} />
+                <Cell key={i} fill={e.isBest ? C.accent : C.info} fillOpacity={e.isBest ? 1 : 0.8} />
               ))}
             </Bar>
           </BarChart>
@@ -130,25 +151,26 @@ function RaceChart({ race }: { race: Race }) {
       {/* Expected Value (only when odds are published) */}
       {evData.length > 0 && (
         <div>
-          <p className="text-xs text-gray-400 uppercase tracking-wide mb-3 font-medium">
+          <p className="text-[11px] text-ink-muted uppercase tracking-wider mb-3 font-semibold">
             Expected Value
           </p>
           <ResponsiveContainer width="100%" height={chartH}>
             <BarChart data={evData} layout="vertical"
               margin={{ left: 0, right: 52, top: 2, bottom: 0 }}>
-              <XAxis type="number" tick={{ fill: "#6b7280", fontSize: 10 }}
+              <XAxis type="number" tick={{ fill: C.axis, fontSize: 10 }}
                 tickFormatter={v => v > 0 ? `+${v}` : `${v}`} />
               <YAxis type="category" dataKey="name" width={95}
-                tick={{ fill: "#d1d5db", fontSize: 12 }} />
-              <ReferenceLine x={0} stroke="#4b5563" />
+                tick={{ fill: C.axisLabel, fontSize: 12 }} />
+              <ReferenceLine x={0} stroke="#3a4250" />
               <Tooltip
                 formatter={(v) => [typeof v === "number" ? (v >= 0 ? `+${v.toFixed(3)}` : v.toFixed(3)) : v, "EV"]}
-                contentStyle={tooltipStyle} labelStyle={{ color: "#f9fafb" }} />
+                contentStyle={tooltipStyle} labelStyle={{ color: "#e8eaed" }}
+                cursor={{ fill: "rgba(255,255,255,0.03)" }} />
               <Bar dataKey="ev" radius={[0, 4, 4, 0]}
-                label={{ position: "right", fill: "#9ca3af", fontSize: 11,
+                label={{ position: "right", fill: C.axisLabel, fontSize: 11,
                   formatter: (v: unknown) => typeof v === "number" ? (v >= 0 ? `+${v.toFixed(2)}` : v.toFixed(2)) : "" }}>
                 {evData.map((e, i) => (
-                  <Cell key={i} fill={e.ev > 0 ? "#16a34a" : "#ef4444"} fillOpacity={0.85} />
+                  <Cell key={i} fill={e.ev > 0 ? C.accent : C.danger} fillOpacity={0.85} />
                 ))}
               </Bar>
             </BarChart>
@@ -159,68 +181,110 @@ function RaceChart({ race }: { race: Race }) {
   )
 }
 
-function ProbBar({ value }: { value: number }) {
+function ProbBar({ value, best }: { value: number; best?: boolean }) {
   const width = Math.round(value * 100)
   return (
-    <div className="flex items-center gap-2 min-w-[90px]">
-      <div className="flex-1 bg-gray-700 rounded-full h-1.5">
+    <div className="flex items-center gap-2 min-w-[96px]">
+      <div className="flex-1 bg-bg rounded-full h-1.5 overflow-hidden">
         <div
-          className="bg-green-500 h-1.5 rounded-full transition-all"
-          style={{ width: `${Math.min(width, 100)}%` }}
+          className="h-1.5 rounded-full transition-all"
+          style={{
+            width: `${Math.min(width, 100)}%`,
+            background: best
+              ? "linear-gradient(90deg, #14c98b, #2ee6a6)"
+              : "#5b9dff",
+          }}
         />
       </div>
-      <span className="text-xs font-mono w-10 text-right">{pct(value)}</span>
+      <span className="text-xs font-mono w-11 text-right text-ink">{pct(value)}</span>
     </div>
   )
 }
 
 function RaceCard({ race }: { race: Race }) {
   const [showChart, setShowChart] = useState(false)
+  const [sort, setSort] = useState<SortKey>("model")
   const hasBet = race.best_bet !== null
   const oddsAvailable = race.horses.some((h) => h.win_odds !== null)
 
+  const horses = useMemo(() => {
+    const arr = [...race.horses]
+    if (sort === "win") arr.sort((a, b) => b.win_prob - a.win_prob)
+    else if (sort === "ev") arr.sort((a, b) => (b.expected_value ?? -Infinity) - (a.expected_value ?? -Infinity))
+    return arr
+  }, [race.horses, sort])
+
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+    <div className={[
+      "surface-card overflow-hidden transition-shadow",
+      hasBet ? "ring-1 ring-accent/20" : "",
+    ].join(" ")}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-800 border-b border-gray-700">
-        <div className="flex items-center gap-3">
-          <span className="text-white font-bold text-lg">Race {race.race_no}</span>
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-line-soft bg-surface-2/60">
+        <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
+          <span className="inline-flex items-center justify-center min-w-[2rem] h-7 px-2 rounded-lg bg-bg border border-line text-ink font-semibold text-sm">
+            R{race.race_no}
+          </span>
           {race.race_class && (
-            <span className="bg-gray-700 text-gray-300 text-xs px-2 py-0.5 rounded-full">
-              {race.race_class}
-            </span>
+            <span className="chip">{race.race_class}</span>
           )}
           {race.distance && (
-            <span className="text-gray-400 text-sm">{race.distance}m</span>
+            <span className="text-ink-muted text-xs">{race.distance}m</span>
           )}
           {race.going && (
-            <span className="text-gray-400 text-sm">· {race.going}</span>
+            <span className="text-ink-dim text-xs">· {race.going}</span>
           )}
           {race.course && (
-            <span className="text-gray-500 text-xs">· {race.course}</span>
+            <span className="text-ink-dim text-xs hidden sm:inline">· {race.course}</span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setShowChart(v => !v)}
             className={[
-              "text-xs px-2.5 py-1 rounded-lg border transition-colors",
+              "inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors",
               showChart
-                ? "bg-blue-800 border-blue-700 text-blue-100"
-                : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white",
+                ? "bg-info/15 border-info/40 text-info"
+                : "bg-bg border-line text-ink-muted hover:text-ink hover:border-line",
             ].join(" ")}
           >
-            📊 {showChart ? "Table" : "Chart"}
+            {showChart ? <TableIcon className="text-sm" /> : <ChartIcon className="text-sm" />}
+            <span className="hidden sm:inline">{showChart ? "Table" : "Chart"}</span>
           </button>
           {hasBet ? (
-            <span className="bg-green-700 text-green-100 text-xs font-semibold px-3 py-1 rounded-full">
-              BET AVAILABLE
+            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-accent/15 text-accent border border-accent/30">
+              <TargetIcon className="text-sm" /> BET
             </span>
           ) : (
-            <span className="text-gray-500 text-xs">No bet</span>
+            <span className="text-ink-dim text-xs px-1">No bet</span>
           )}
         </div>
       </div>
+
+      {/* Sort controls (table view only) */}
+      {!showChart && (
+        <div className="flex items-center gap-1.5 px-4 py-2 border-b border-line-soft text-[11px] text-ink-dim">
+          <span className="uppercase tracking-wider mr-1">Sort</span>
+          {([
+            ["model", "Model rank"],
+            ["win", "Win %"],
+            ...(oddsAvailable ? [["ev", "EV"] as [SortKey, string]] : []),
+          ] as [SortKey, string][]).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setSort(key)}
+              className={[
+                "px-2 py-0.5 rounded-md transition-colors",
+                sort === key
+                  ? "bg-surface-2 text-ink border border-line"
+                  : "text-ink-muted hover:text-ink border border-transparent",
+              ].join(" ")}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Chart view */}
       {showChart && <RaceChart race={race} />}
@@ -230,67 +294,67 @@ function RaceCard({ race }: { race: Race }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wide">
-                <th className="text-left px-4 py-2">Horse</th>
-                <th className="text-center px-2 py-2">Draw</th>
-                <th className="text-center px-2 py-2">Jockey</th>
-                <th className="px-4 py-2">Win %</th>
-                <th className="text-center px-2 py-2">Odds</th>
+              <tr className="border-b border-line-soft text-ink-dim text-[11px] uppercase tracking-wider">
+                <th className="text-left px-4 py-2 font-medium">Horse</th>
+                <th className="text-center px-2 py-2 font-medium hidden sm:table-cell">Draw</th>
+                <th className="text-center px-2 py-2 font-medium hidden md:table-cell">Jockey</th>
+                <th className="px-4 py-2 font-medium">Win %</th>
+                <th className="text-center px-2 py-2 font-medium">Odds</th>
                 {oddsAvailable && (
                   <>
-                    <th className="text-center px-2 py-2">EV</th>
-                    <th className="text-center px-2 py-2">Stake</th>
+                    <th className="text-center px-2 py-2 font-medium">EV</th>
+                    <th className="text-center px-2 py-2 font-medium hidden sm:table-cell">Stake</th>
+                    <th className="text-center px-2 py-2 font-medium">Bet?</th>
                   </>
                 )}
-                {oddsAvailable && <th className="text-center px-2 py-2">Bet?</th>}
               </tr>
             </thead>
             <tbody>
-              {race.horses.map((horse) => {
+              {horses.map((horse) => {
                 const isBest = horse.name === race.best_bet
                 return (
                   <tr
                     key={horse.name}
                     className={[
-                      "border-b border-gray-800/50 transition-colors",
+                      "border-b border-line-soft/60 transition-colors",
                       isBest
-                        ? "bg-green-950/60 hover:bg-green-950/80"
-                        : "hover:bg-gray-800/40",
+                        ? "bg-accent/[0.07] hover:bg-accent/[0.1]"
+                        : "hover:bg-surface-2/50",
                     ].join(" ")}
                   >
-                    <td className="px-4 py-2.5 font-medium text-white">
+                    <td className="px-4 py-2.5 font-medium text-ink">
                       <div className="flex items-center gap-2">
                         {isBest && (
-                          <span className="text-green-400 text-base">★</span>
+                          <StarFilledIcon className="text-accent text-sm shrink-0" />
                         )}
-                        <div>
-                          <div>{horse.name}</div>
+                        <div className="min-w-0">
+                          <div className="truncate">{horse.name}</div>
                           {horse.name_ch && (
-                            <div className="text-gray-400 text-xs font-normal">{horse.name_ch}</div>
+                            <div className="text-ink-dim text-xs font-normal truncate">{horse.name_ch}</div>
                           )}
                         </div>
                       </div>
                     </td>
-                    <td className="text-center px-2 py-2.5 text-gray-300">
+                    <td className="text-center px-2 py-2.5 text-ink-muted hidden sm:table-cell">
                       {horse.draw ?? "—"}
                     </td>
-                    <td className="text-center px-2 py-2.5 text-xs">
+                    <td className="text-center px-2 py-2.5 text-xs hidden md:table-cell">
                       {horse.jockey_ch || horse.jockey
                         ? (
                           <div>
-                            {horse.jockey_ch && <div className="text-gray-300">{horse.jockey_ch}</div>}
-                            {horse.jockey && <div className="text-gray-500">{horse.jockey}</div>}
+                            {horse.jockey_ch && <div className="text-ink-muted">{horse.jockey_ch}</div>}
+                            {horse.jockey && <div className="text-ink-dim">{horse.jockey}</div>}
                           </div>
                         )
-                        : <span className="text-gray-600">—</span>
+                        : <span className="text-ink-dim">—</span>
                       }
                     </td>
                     <td className="px-4 py-2.5">
-                      <ProbBar value={horse.win_prob} />
+                      <ProbBar value={horse.win_prob} best={isBest} />
                     </td>
-                    <td className="text-center px-2 py-2.5 text-gray-300">
+                    <td className="text-center px-2 py-2.5 text-ink-muted">
                       {horse.win_odds != null ? horse.win_odds.toFixed(1) : (
-                        <span className="text-gray-600">—</span>
+                        <span className="text-ink-dim">—</span>
                       )}
                     </td>
                     {oddsAvailable && (
@@ -300,23 +364,21 @@ function RaceCard({ race }: { race: Race }) {
                             ? (horse.expected_value >= 0 ? "+" : "") + horse.expected_value.toFixed(3)
                             : "—"}
                         </td>
-                        <td className="text-center px-2 py-2.5 text-gray-300 font-mono text-xs">
+                        <td className="text-center px-2 py-2.5 text-ink-muted font-mono text-xs hidden sm:table-cell">
                           {horse.bet_fraction != null && horse.bet_fraction > 0
                             ? horse.bet_fraction.toFixed(1) + "%"
                             : "—"}
                         </td>
+                        <td className="text-center px-2 py-2.5">
+                          {horse.should_bet ? (
+                            <span className="inline-flex items-center gap-1 bg-accent/15 text-accent border border-accent/30 text-[11px] font-bold px-2 py-0.5 rounded-md">
+                              <CheckIcon className="text-xs" /> BET
+                            </span>
+                          ) : (
+                            <span className="text-ink-dim text-xs">—</span>
+                          )}
+                        </td>
                       </>
-                    )}
-                    {oddsAvailable && (
-                      <td className="text-center px-2 py-2.5">
-                        {horse.should_bet ? (
-                          <span className="bg-green-600 text-white text-xs font-bold px-2 py-0.5 rounded">
-                            BET
-                          </span>
-                        ) : (
-                          <span className="text-gray-600 text-xs">—</span>
-                        )}
-                      </td>
                     )}
                   </tr>
                 )
@@ -331,22 +393,24 @@ function RaceCard({ race }: { race: Race }) {
         const best = race.horses.find((h) => h.name === race.best_bet)
         if (!best) return null
         return (
-          <div className="px-4 py-3 bg-green-950/40 border-t border-green-900/40 flex items-center justify-between">
-            <div>
-              <span className="text-green-400 font-semibold">★ {best.name}</span>
+          <div className="px-4 py-3 bg-accent/[0.06] border-t border-accent/15 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <span className="inline-flex items-center gap-1.5 text-accent font-semibold">
+                <StarFilledIcon className="text-sm shrink-0" /> {best.name}
+              </span>
               {best.name_ch && (
-                <span className="text-green-600 text-sm ml-1">{best.name_ch}</span>
+                <span className="text-accent-strong text-sm ml-1.5">{best.name_ch}</span>
               )}
-              <span className="text-gray-400 text-sm ml-2">
+              <div className="text-ink-muted text-xs mt-0.5">
                 {pct(best.win_prob)} win probability
                 {best.win_odds != null && ` · odds ${best.win_odds.toFixed(1)}`}
                 {best.expected_value != null && ` · EV ${best.expected_value >= 0 ? "+" : ""}${best.expected_value.toFixed(3)}`}
-              </span>
+              </div>
             </div>
             {best.bet_fraction != null && best.bet_fraction > 0 && (
-              <div className="text-right">
-                <span className="text-green-300 font-bold text-lg">{best.bet_fraction.toFixed(1)}%</span>
-                <p className="text-gray-500 text-xs">of bankroll</p>
+              <div className="text-right shrink-0">
+                <span className="text-accent font-bold text-lg leading-none">{best.bet_fraction.toFixed(1)}%</span>
+                <p className="text-ink-dim text-[11px] mt-0.5">of bankroll</p>
               </div>
             )}
           </div>
@@ -355,21 +419,22 @@ function RaceCard({ race }: { race: Race }) {
 
       {/* Odds not yet available notice */}
       {!oddsAvailable && (
-        <div className="px-4 py-2 bg-yellow-950/20 border-t border-yellow-900/20 text-yellow-600 text-xs">
+        <div className="px-4 py-2 bg-warn/[0.06] border-t border-warn/15 text-warn/90 text-xs flex items-center gap-1.5">
+          <AlertIcon className="text-sm shrink-0" />
           Odds not yet published — probabilities only. Re-fetch once HKJC posts odds.
         </div>
       )}
 
       {/* QPL section */}
       {race.qpl_bets && race.qpl_bets.length > 0 && (
-        <div className="border-t border-gray-800 px-4 py-3">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs font-semibold text-purple-400 uppercase tracking-wide">
-              Quinella Place
+        <div className="border-t border-line-soft px-4 py-3">
+          <div className="flex items-center gap-2 mb-2.5">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand uppercase tracking-wider">
+              <LayersIcon className="text-sm" /> Quinella Place
             </span>
             {!race.qpl_bets[0].market_odds && (
-              <span className="text-xs text-gray-500 italic">
-                (Ranked by Harville probability — market odds not yet available)
+              <span className="text-[11px] text-ink-dim italic">
+                Ranked by Harville probability — market odds not yet available
               </span>
             )}
           </div>
@@ -378,37 +443,37 @@ function RaceCard({ race }: { race: Race }) {
               <div
                 key={i}
                 className={[
-                  "flex items-center justify-between rounded-lg px-3 py-2 text-sm",
+                  "flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm",
                   qb.should_bet
-                    ? "bg-purple-950/50 border border-purple-800/50"
-                    : "bg-gray-800/40",
+                    ? "bg-brand/[0.1] border border-brand/30"
+                    : "bg-surface-2/50 border border-transparent",
                 ].join(" ")}
               >
-                <div className="flex items-center gap-2">
-                  {qb.should_bet && <span className="text-purple-400 text-xs">★</span>}
-                  <span className="font-medium text-white">{qb.horse_a}</span>
-                  <span className="text-gray-500 text-xs">+</span>
-                  <span className="font-medium text-white">{qb.horse_b}</span>
+                <div className="flex items-center gap-2 min-w-0">
+                  {qb.should_bet && <StarFilledIcon className="text-brand text-xs shrink-0" />}
+                  <span className="font-medium text-ink truncate">{qb.horse_a}</span>
+                  <span className="text-ink-dim text-xs">+</span>
+                  <span className="font-medium text-ink truncate">{qb.horse_b}</span>
                 </div>
-                <div className="flex items-center gap-4 text-xs font-mono">
-                  <span className="text-gray-400">
+                <div className="flex items-center gap-3 text-xs font-mono shrink-0">
+                  <span className="text-ink-muted">
                     {(qb.qpl_prob * 100).toFixed(1)}%
                   </span>
                   {qb.market_odds != null && (
-                    <span className="text-gray-300">@{qb.market_odds.toFixed(1)}</span>
+                    <span className="text-ink-muted">@{qb.market_odds.toFixed(1)}</span>
                   )}
                   {qb.ev != null && (
-                    <span className={qb.ev >= 0 ? "text-green-400" : "text-red-400"}>
-                      EV {qb.ev >= 0 ? "+" : ""}{qb.ev.toFixed(3)}
+                    <span className={qb.ev >= 0 ? "text-accent" : "text-danger"}>
+                      {qb.ev >= 0 ? "+" : ""}{qb.ev.toFixed(3)}
                     </span>
                   )}
                   {qb.should_bet && qb.bet_fraction != null && (
-                    <span className="bg-purple-600 text-white px-2 py-0.5 rounded font-bold">
-                      {qb.bet_fraction.toFixed(1)}% bankroll
+                    <span className="bg-brand/20 text-brand border border-brand/30 px-2 py-0.5 rounded font-bold whitespace-nowrap">
+                      {qb.bet_fraction.toFixed(1)}%
                     </span>
                   )}
                   {!qb.should_bet && qb.market_odds != null && (
-                    <span className="text-gray-600">—</span>
+                    <span className="text-ink-dim">—</span>
                   )}
                 </div>
               </div>
@@ -416,6 +481,19 @@ function RaceCard({ race }: { race: Race }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function StatCard({ label, value, tone }: { label: string; value: React.ReactNode; tone?: "accent" | "brand" | "warn" }) {
+  const toneClass =
+    tone === "accent" ? "text-accent" :
+    tone === "brand" ? "text-brand" :
+    tone === "warn" ? "text-warn" : "text-ink"
+  return (
+    <div className="flex flex-col">
+      <span className="text-[11px] uppercase tracking-wider text-ink-dim">{label}</span>
+      <span className={`text-lg font-semibold leading-tight mt-0.5 ${toneClass}`}>{value}</span>
     </div>
   )
 }
@@ -432,6 +510,7 @@ export default function Dashboard() {
   const [status, setStatus] = useState("")
   const [error, setError] = useState("")
   const [lastFetched, setLastFetched] = useState<string | null>(null)
+  const [betsOnly, setBetsOnly] = useState(false)
 
   // Auto-detect next meeting on mount
   useEffect(() => {
@@ -496,57 +575,75 @@ export default function Dashboard() {
     r.horses.some((h) => h.win_odds !== null)
   ) ?? false
 
+  const visibleRaces = useMemo(() => {
+    if (!result) return []
+    if (!betsOnly) return result.races
+    return result.races.filter(
+      (r) => r.best_bet !== null || (r.qpl_bets?.some((q) => q.should_bet) ?? false)
+    )
+  }, [result, betsOnly])
+
   return (
-    <div className="min-h-screen bg-gray-950">
+    <div className="min-h-screen">
       {/* ── Top bar ─────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-10 bg-gray-900 border-b border-gray-800 px-4 py-3">
-        <div className="max-w-5xl mx-auto flex items-center gap-4">
-          <span className="text-xl font-bold text-white flex items-center gap-2">
-            🏇 HKJC Predictor
+      <header className="sticky top-0 z-20 bg-surface/85 backdrop-blur-md border-b border-line">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center gap-3">
+          <span className="text-base font-semibold text-ink flex items-center gap-2">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-surface-2 border border-line text-accent">
+              <TrophyIcon className="text-base" />
+            </span>
+            HKJC Predictor
           </span>
 
-          <div className="flex items-center gap-2 ml-2">
-            <input
-              type="date"
-              value={meetingDate}
-              onChange={(e) => setMeetingDate(e.target.value)}
-              className="bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
+          <div className="flex items-center gap-2 ml-1">
+            <div className="relative">
+              <CalendarIcon className="text-sm text-ink-dim absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="date"
+                value={meetingDate}
+                onChange={(e) => setMeetingDate(e.target.value)}
+                className="field pl-8 pr-3 py-1.5 text-sm"
+              />
+            </div>
             <select
               value={venue}
               onChange={(e) => setVenue(e.target.value)}
-              className="bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              className="field px-3 py-1.5 text-sm cursor-pointer"
             >
-              <option value="ST">SHA TIN (ST)</option>
-              <option value="HV">HAPPY VALLEY (HV)</option>
+              <option value="ST">Sha Tin (ST)</option>
+              <option value="HV">Happy Valley (HV)</option>
             </select>
           </div>
 
           <button
             onClick={fetchPredictions}
             disabled={loading || !meetingDate}
-            className="bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold px-4 py-1.5 rounded-lg text-sm transition-colors flex items-center gap-2"
+            className="btn-accent px-4 py-1.5 text-sm flex items-center gap-2"
           >
             {loading ? (
               <>
-                <span className="animate-spin text-base">⟳</span> {status || "Fetching…"}
+                <SpinnerIcon className="text-base animate-spin-smooth" />
+                <span className="max-w-[180px] truncate">{status || "Fetching…"}</span>
               </>
             ) : (
-              <>⟳ Fetch Predictions</>
+              <>
+                <RefreshIcon className="text-base" /> Fetch
+              </>
             )}
           </button>
 
           <div className="ml-auto flex items-center gap-3">
             {lastFetched && (
-              <span className="text-gray-500 text-xs hidden sm:block">
+              <span className="text-ink-dim text-xs hidden sm:block">
                 Updated {lastFetched}
               </span>
             )}
             <button
               onClick={handleLogout}
-              className="text-gray-400 hover:text-white text-sm transition-colors"
+              className="inline-flex items-center gap-1.5 text-ink-muted hover:text-ink text-sm transition-colors"
             >
-              Logout
+              <LogoutIcon className="text-base" />
+              <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </div>
@@ -556,64 +653,87 @@ export default function Dashboard() {
       <main className="max-w-5xl mx-auto px-4 py-6 space-y-4">
         {/* Summary bar */}
         {result && (
-          <div className="bg-gray-900 border border-gray-800 rounded-xl px-5 py-3 flex flex-wrap items-center gap-6 text-sm">
-            <div>
-              <span className="text-gray-400">Meeting </span>
-              <span className="text-white font-semibold">
-                {result.date} @ {result.venue}
-              </span>
+          <div className="surface-card px-5 py-4 flex flex-wrap items-center gap-x-8 gap-y-4 animate-fade-up">
+            <StatCard
+              label="Meeting"
+              value={<span className="text-sm">{result.date} · {result.venue}</span>}
+            />
+            <StatCard label="Races" value={result.races.length} />
+            <StatCard label="Win bets" value={betsTotal} tone={betsTotal > 0 ? "accent" : undefined} />
+            <StatCard label="QPL bets" value={qplTotal > 0 ? qplTotal : "—"} tone={qplTotal > 0 ? "brand" : undefined} />
+
+            <div className="ml-auto flex items-center gap-3">
+              {!oddsReady && (
+                <span className="chip text-warn border-warn/30">
+                  <AlertIcon className="text-sm" /> Odds pending
+                </span>
+              )}
+              <button
+                onClick={() => setBetsOnly((v) => !v)}
+                className={[
+                  "inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors",
+                  betsOnly
+                    ? "bg-accent/15 border-accent/30 text-accent"
+                    : "bg-bg border-line text-ink-muted hover:text-ink",
+                ].join(" ")}
+              >
+                <FilterIcon className="text-sm" />
+                {betsOnly ? "Bets only" : "All races"}
+              </button>
             </div>
-            <div>
-              <span className="text-gray-400">Races </span>
-              <span className="text-white font-semibold">{result.races.length}</span>
-            </div>
-            <div>
-              <span className="text-gray-400">Win bets </span>
-              <span className={betsTotal > 0 ? "text-green-400 font-semibold" : "text-gray-400"}>
-                {betsTotal}
-              </span>
-            </div>
-            <div>
-              <span className="text-gray-400">QPL bets </span>
-              <span className={qplTotal > 0 ? "text-purple-400 font-semibold" : "text-gray-400"}>
-                {qplTotal > 0 ? qplTotal : "—"}
-              </span>
-            </div>
-            {!oddsReady && (
-              <div className="text-yellow-500 text-xs bg-yellow-950/30 border border-yellow-900/30 px-3 py-1 rounded-full">
-                ⚠ Odds not published yet — bet sizing unavailable
-              </div>
-            )}
           </div>
         )}
 
         {/* Error */}
         {error && (
-          <div className="bg-red-950/40 border border-red-900/40 text-red-300 rounded-xl px-4 py-3 text-sm">
-            {error}
+          <div className="surface-card border-danger/30 bg-danger/[0.06] text-danger px-4 py-3 text-sm flex items-center gap-2">
+            <AlertIcon className="text-base shrink-0" /> {error}
           </div>
         )}
 
         {/* Empty state */}
         {!result && !loading && !error && (
-          <div className="text-center py-20 text-gray-500">
-            <div className="text-5xl mb-4">🏇</div>
-            <p className="text-lg">Select a date and click <strong className="text-gray-300">Fetch Predictions</strong></p>
-            <p className="text-sm mt-1">Race cards are usually published the day before the meeting.</p>
+          <div className="text-center py-24 animate-fade-up">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-surface-2 border border-line text-accent mb-5">
+              <TrophyIcon className="text-3xl" />
+            </div>
+            <p className="text-lg text-ink">
+              Select a date and click <strong className="text-accent font-semibold">Fetch</strong>
+            </p>
+            <p className="text-sm mt-1.5 text-ink-muted">
+              Race cards are usually published the day before the meeting.
+            </p>
+          </div>
+        )}
+
+        {/* Loading skeleton */}
+        {loading && !result && (
+          <div className="text-center py-24 text-ink-muted animate-fade-up">
+            <SpinnerIcon className="text-4xl text-accent animate-spin-smooth mx-auto mb-4" />
+            <p className="text-sm">{status || "Loading…"}</p>
           </div>
         )}
 
         {/* Message from API (e.g. no races found) */}
         {result?.message && (
-          <div className="bg-yellow-950/30 border border-yellow-900/30 text-yellow-400 rounded-xl px-4 py-3 text-sm">
-            {result.message}
+          <div className="surface-card border-warn/25 bg-warn/[0.06] text-warn px-4 py-3 text-sm flex items-center gap-2">
+            <AlertIcon className="text-base shrink-0" /> {result.message}
+          </div>
+        )}
+
+        {/* Bets-only empty */}
+        {result && betsOnly && visibleRaces.length === 0 && (
+          <div className="text-center py-16 text-ink-muted">
+            No qualifying bets in this meeting. Toggle back to <strong className="text-ink">All races</strong> to view every card.
           </div>
         )}
 
         {/* Race cards */}
-        {result?.races.map((race) => (
-          <RaceCard key={race.race_no} race={race} />
-        ))}
+        <div className="space-y-4">
+          {visibleRaces.map((race) => (
+            <RaceCard key={race.race_no} race={race} />
+          ))}
+        </div>
       </main>
     </div>
   )

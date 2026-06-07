@@ -2,6 +2,7 @@
 
 import { useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { TrophyIcon, LockIcon, SpinnerIcon, ArrowRightIcon, AlertIcon } from "./components/icons"
 
 function LoginForm() {
   const [password, setPassword] = useState("")
@@ -32,36 +33,64 @@ function LoginForm() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-950">
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 w-full max-w-sm shadow-2xl">
-        <div className="text-center mb-8">
-          <div className="text-4xl mb-3">🏇</div>
-          <h1 className="text-2xl font-bold text-white">HKJC Predictor</h1>
-          <p className="text-gray-400 text-sm mt-1">Private dashboard</p>
+    <main className="min-h-screen flex items-center justify-center px-4">
+      <div className="w-full max-w-sm animate-fade-up">
+        {/* Brand */}
+        <div className="flex flex-col items-center text-center mb-8">
+          <div className="relative mb-5">
+            <div className="absolute inset-0 rounded-2xl bg-accent/20 blur-2xl" />
+            <div className="relative flex items-center justify-center w-16 h-16 rounded-2xl bg-surface-2 border border-line text-accent">
+              <TrophyIcon className="text-3xl" />
+            </div>
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">HKJC Predictor</h1>
+          <p className="text-ink-muted text-sm mt-1.5">Private prediction dashboard</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter password"
-            autoFocus
-            className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder-gray-500"
-          />
+        {/* Card */}
+        <div className="surface-card glow-accent p-7">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <label className="block">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-ink-muted mb-2">
+                <LockIcon className="text-sm" /> Access password
+              </span>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password"
+                autoFocus
+                className="field w-full px-4 py-3 text-sm placeholder:text-ink-dim"
+              />
+            </label>
 
-          {error && (
-            <p className="text-red-400 text-sm">{error}</p>
-          )}
+            {error && (
+              <p className="flex items-center gap-1.5 text-danger text-sm">
+                <AlertIcon className="text-base shrink-0" /> {error}
+              </p>
+            )}
 
-          <button
-            type="submit"
-            disabled={loading || !password}
-            className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-colors"
-          >
-            {loading ? "Signing in…" : "Enter"}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={loading || !password}
+              className="btn-accent w-full py-3 text-sm flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <SpinnerIcon className="text-base animate-spin-smooth" /> Signing in…
+                </>
+              ) : (
+                <>
+                  Enter <ArrowRightIcon className="text-base" />
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+
+        <p className="text-center text-ink-dim text-xs mt-6">
+          Authorized access only
+        </p>
       </div>
     </main>
   )

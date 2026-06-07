@@ -1,3 +1,142 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  /* Surfaces */
+  --bg: #0a0c10;
+  --surface: #11141b;
+  --surface-2: #161a23;
+  --border: #232834;
+  --border-soft: #1b2029;
+
+  /* Text */
+  --text: #e8eaed;
+  --text-muted: #9aa3b2;
+  --text-dim: #646d7c;
+
+  /* Accents */
+  --accent: #2ee6a6;          /* signature green */
+  --accent-strong: #14c98b;
+  --accent-glow: rgba(46, 230, 166, 0.18);
+  --info: #5b9dff;
+  --purple: #b78cff;
+  --danger: #ff6b6b;
+  --warn: #ffce5b;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background:
+      radial-gradient(1200px 600px at 50% -200px, rgba(46, 230, 166, 0.06), transparent 70%),
+      radial-gradient(900px 500px at 100% 0%, rgba(91, 157, 255, 0.05), transparent 60%),
+      var(--bg);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Refined dark scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: #2e3543;
+    background-clip: content-box;
+  }
+
+  /* Date / select controls match the dark theme */
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.7);
+    cursor: pointer;
+  }
+  select option {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+}
+
+@layer components {
+  .surface-card {
+    background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+
+  .glow-accent {
+    box-shadow: 0 0 0 1px var(--border), 0 18px 40px -22px var(--accent-glow);
+  }
+
+  .field {
+    background: #0d1016;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 10px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .field:focus {
+    outline: none;
+    border-color: var(--accent-strong);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .btn-accent {
+    background: linear-gradient(180deg, var(--accent) 0%, var(--accent-strong) 100%);
+    color: #04130d;
+    font-weight: 600;
+    border-radius: 10px;
+    transition: filter 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    box-shadow: 0 10px 24px -12px var(--accent-glow);
+  }
+  .btn-accent:hover:not(:disabled) {
+    filter: brightness(1.07);
+  }
+  .btn-accent:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.7rem;
+    line-height: 1;
+    padding: 0.3rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.animate-spin-smooth {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fade-up 0.35s ease both;
+}
