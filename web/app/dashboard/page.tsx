@@ -11,12 +11,14 @@ import {
   RefreshIcon, LogoutIcon, CalendarIcon, FilterIcon, CheckIcon,
   TargetIcon, LayersIcon, SpinnerIcon,
 } from "../components/icons"
+import StakeView from "./StakeView"
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 interface Horse {
   name: string
   name_ch: string | null
+  horse_no: number | null
   draw: number | null
   jockey: string | null
   jockey_ch: string | null
@@ -327,6 +329,11 @@ function RaceCard({ race }: { race: Race }) {
                         {isBest && (
                           <StarFilledIcon className="text-accent text-sm shrink-0" />
                         )}
+                        {horse.horse_no != null && (
+                          <span className="inline-flex items-center justify-center w-5 h-5 shrink-0 rounded bg-surface-2 border border-line text-ink-muted text-[11px] font-semibold tabular-nums">
+                            {horse.horse_no}
+                          </span>
+                        )}
                         <div className="min-w-0">
                           <div className="truncate">{horse.name}</div>
                           {horse.name_ch && (
@@ -396,7 +403,7 @@ function RaceCard({ race }: { race: Race }) {
           <div className="px-4 py-3 bg-accent/[0.06] border-t border-accent/15 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <span className="inline-flex items-center gap-1.5 text-accent font-semibold">
-                <StarFilledIcon className="text-sm shrink-0" /> {best.name}
+                <StarFilledIcon className="text-sm shrink-0" /> {best.horse_no != null ? `#${best.horse_no} ` : ""}{best.name}
               </span>
               {best.name_ch && (
                 <span className="text-accent-strong text-sm ml-1.5">{best.name_ch}</span>
@@ -511,6 +518,7 @@ export default function Dashboard() {
   const [error, setError] = useState("")
   const [lastFetched, setLastFetched] = useState<string | null>(null)
   const [betsOnly, setBetsOnly] = useState(false)
+  const [view, setView] = useState<"model" | "stake">("model")
 
   // Auto-detect next meeting on mount
   useEffect(() => {
@@ -651,6 +659,32 @@ export default function Dashboard() {
 
       {/* ── Body ────────────────────────────────────────────────────── */}
       <main className="max-w-5xl mx-auto px-4 py-6 space-y-4">
+        {/* ── View tabs ───────────────────────────────────────────────── */}
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-surface-2 border border-line w-fit animate-fade-up">
+          {([
+            ["model", "Model"],
+            ["stake", "Stake · RaceLab"],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setView(key)}
+              className={[
+                "px-4 py-1.5 text-sm rounded-lg transition-colors",
+                view === key
+                  ? "bg-accent/15 text-accent font-medium"
+                  : "text-ink-muted hover:text-ink",
+              ].join(" ")}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {view === "stake" && (
+          <StakeView date={meetingDate} venue={venue} model={result} />
+        )}
+
+        {view === "model" && (<>
         {/* Summary bar */}
         {result && (
           <div className="surface-card px-5 py-4 flex flex-wrap items-center gap-x-8 gap-y-4 animate-fade-up">
@@ -734,6 +768,7 @@ export default function Dashboard() {
             <RaceCard key={race.race_no} race={race} />
           ))}
         </div>
+        </>)}
       </main>
     </div>
   )

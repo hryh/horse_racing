@@ -23,6 +23,8 @@ web/.next/
 web/node_modules/
 web/out/
 web/.vercel/
+web/next-env.d.ts
+web/*.tsbuildinfo
 
 # Claude Code
 .claude/
@@ -30,3 +32,5 @@ web/.vercel/
 # OS
 .DS_Store
 Thumbs.db
+
+# local build 

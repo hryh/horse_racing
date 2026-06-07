@@ -141,6 +141,7 @@ def predict(meeting_date: str, venue: str = "ST"):
             horses.append({
                 "name":           dec.horse_name,
                 "name_ch":        ru.get("horse_ch"),
+                "horse_no":       ru.get("horse_no"),
                 "draw":           ru.get("draw"),
                 "jockey":         ru.get("jockey"),
                 "jockey_ch":      ru.get("jockey_ch"),
