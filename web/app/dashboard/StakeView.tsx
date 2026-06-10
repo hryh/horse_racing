@@ -42,12 +42,16 @@ interface StakeResponse {
   races: StakeRace[]
   error?: string
   note?: string
+  stakeUrl?: string
 }
 
 interface ModelHorse {
   name: string
   win_prob: number
+  win_odds: number | null
+  expected_value: number | null
   should_bet: boolean
+  bet_fraction: number | null
 }
 interface ModelRace {
   race_no: number
@@ -73,6 +77,105 @@ function fmtOdds(v: number | null): string {
   return v == null ? "—" : v.toFixed(2)
 }
 
+// ── Cloudflare fallback: model-based summary ────────────────────────────────
+function ModelSummary({ model, date, stakeUrl }: {
+  model: ModelResult | null
+  date: string
+  stakeUrl?: string
+}) {
+  const stakeLink = stakeUrl || "https://stake.com/sports/racing/horse-racing/asia"
+  const bets = model?.races
+    .filter((r) => r.best_bet !== null)
+    .map((r) => {
+      const best = r.horses.find((h) => h.name === r.best_bet)
+      return { race_no: r.race_no, horse: best, race: r }
+    })
+    .filter((b) => b.horse != null) ?? []
+
+  return (
+    <div className="space-y-4 animate-fade-up">
+      {/* Blocked notice */}
+      <div className="surface-card px-4 sm:px-5 py-4 border-warn/20 bg-warn/[0.04]">
+        <div className="flex items-start gap-3">
+          <AlertIcon className="text-warn text-base mt-0.5 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-sm text-ink font-medium">Stake is Cloudflare-protected</p>
+            <p className="text-xs text-ink-muted mt-0.5 leading-relaxed">
+              Server-side scraping is blocked. Open Stake directly in your browser to see
+              RaceLab tips and live Stake odds for {date}.
+            </p>
+            <a
+              href={stakeLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 mt-2.5 text-xs font-medium text-accent hover:text-accent/80 transition-colors"
+            >
+              Open {date} on Stake ↗
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* Show model bets as a reference while checking Stake manually */}
+      {model && bets.length > 0 && (
+        <div className="surface-card overflow-hidden">
+          <div className="px-4 sm:px-5 py-3 border-b border-line bg-surface-2/60">
+            <p className="text-[11px] uppercase tracking-wider text-ink-dim font-semibold">
+              Model bets — cross-reference with Stake
+            </p>
+          </div>
+          <div className="divide-y divide-line-soft">
+            {bets.map(({ race_no, horse }) => {
+              if (!horse) return null
+              const ev = horse.expected_value
+              return (
+                <div key={race_no} className="px-4 sm:px-5 py-3 flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-ink-muted bg-surface-2 border border-line rounded px-1.5 py-0.5">
+                        R{race_no}
+                      </span>
+                      <StarFilledIcon className="text-accent text-xs shrink-0" />
+                      <span className="text-sm font-semibold text-accent truncate">{horse.name}</span>
+                    </div>
+                    <div className="text-xs text-ink-muted mt-0.5 flex items-center gap-3 flex-wrap">
+                      <span>{(horse.win_prob * 100).toFixed(1)}% win</span>
+                      {horse.win_odds != null && <span>HKJC @{horse.win_odds.toFixed(1)}</span>}
+                      {ev != null && (
+                        <span className={ev >= 0 ? "text-accent" : "text-danger"}>
+                          EV {ev >= 0 ? "+" : ""}{ev.toFixed(3)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {horse.bet_fraction != null && horse.bet_fraction > 0 && (
+                    <div className="text-right shrink-0">
+                      <span className="text-accent font-bold">{horse.bet_fraction.toFixed(1)}%</span>
+                      <p className="text-ink-dim text-[10px]">bankroll</p>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {model && bets.length === 0 && (
+        <p className="text-center text-ink-dim text-sm py-8">
+          No model bets for this meeting. Fetch predictions first.
+        </p>
+      )}
+
+      {!model && (
+        <p className="text-center text-ink-dim text-sm py-8">
+          Fetch predictions first, then cross-reference with Stake manually.
+        </p>
+      )}
+    </div>
+  )
+}
+
 // ── Component ───────────────────────────────────────────────────────────────
 
 export default function StakeView({
@@ -95,7 +198,7 @@ export default function StakeView({
     try {
       const res = await fetch(`/api/stake?date=${date}&venue=${venue}`)
       const body: StakeResponse = await res.json()
-      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`)
+      if (!res.ok && !body.error) throw new Error(`HTTP ${res.status}`)
       setData(body)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err))
@@ -127,6 +230,11 @@ export default function StakeView({
     return map
   }, [model])
 
+  // Cloudflare block — show fallback UI immediately
+  if (data?.error === "cloudflare_blocked") {
+    return <ModelSummary model={model} date={date} stakeUrl={data.stakeUrl} />
+  }
+
   return (
     <div className="space-y-4">
       {/* Control bar */}
@@ -140,6 +248,16 @@ export default function StakeView({
             <div className="text-[11px] uppercase tracking-wide text-ink-dim">Races found</div>
             <div className="text-sm text-ink font-medium tabular-nums">{data.discovered}</div>
           </div>
+        )}
+        {data?.stakeUrl && (
+          <a
+            href={data.stakeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-ink-dim hover:text-accent transition-colors"
+          >
+            Stake ↗
+          </a>
         )}
         <button
           onClick={load}
@@ -171,10 +289,23 @@ export default function StakeView({
         </div>
       )}
 
-      {data?.error && (
+      {/* Non-cloudflare errors */}
+      {data?.error && data.error !== "cloudflare_blocked" && (
         <div className="surface-card border-warn/25 bg-warn/[0.06] text-warn px-4 py-3 text-sm flex items-start gap-2">
           <AlertIcon className="text-base shrink-0 mt-0.5" />
-          <span>{data.note || data.error}</span>
+          <div className="min-w-0">
+            <span>{data.note || data.error}</span>
+            {data.stakeUrl && (
+              <a
+                href={data.stakeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block mt-1 text-xs text-accent hover:text-accent/80 transition-colors"
+              >
+                Check on Stake ↗
+              </a>
+            )}
+          </div>
         </div>
       )}
 
@@ -261,10 +392,8 @@ export default function StakeView({
                   <tr className="text-[11px] uppercase tracking-wide text-ink-dim border-b border-line">
                     <th className="text-left font-medium px-3 py-2">#</th>
                     <th className="text-left font-medium px-3 py-2">Horse</th>
-                    {/* Draw: hidden on mobile */}
                     <th className="text-right font-medium px-3 py-2 hidden sm:table-cell">Dr</th>
                     <th className="text-right font-medium px-3 py-2">Win</th>
-                    {/* Place: hidden on mobile */}
                     <th className="text-right font-medium px-3 py-2 hidden sm:table-cell">Plc</th>
                     <th className="text-right font-medium px-3 py-2">Model %</th>
                     <th className="text-right font-medium px-3 py-2">Edge</th>
@@ -293,12 +422,10 @@ export default function StakeView({
                             )}
                           </span>
                         </td>
-                        {/* Draw: hidden on mobile */}
                         <td className="px-3 py-2 text-right text-ink-muted tabular-nums hidden sm:table-cell">
                           {r.draw ?? "—"}
                         </td>
                         <td className="px-3 py-2 text-right text-ink tabular-nums">{fmtOdds(r.win)}</td>
-                        {/* Place: hidden on mobile */}
                         <td className="px-3 py-2 text-right text-ink-muted tabular-nums hidden sm:table-cell">
                           {fmtOdds(r.place)}
                         </td>
