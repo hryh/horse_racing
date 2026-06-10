@@ -27,7 +27,7 @@ interface Horse {
   win_odds: number | null
   expected_value: number | null
   should_bet: boolean
-  bet_fraction: number | null  // % of bankroll already multiplied by 100
+  bet_fraction: number | null
 }
 
 interface QplBet {
@@ -64,7 +64,6 @@ type SortKey = "model" | "win" | "ev"
 
 const API = "/api"
 
-// Chart / accent palette (matches globals.css tokens)
 const C = {
   accent: "#2ee6a6",
   accentDim: "#14c98b",
@@ -121,7 +120,7 @@ function RaceChart({ race }: { race: Race }) {
   }
 
   return (
-    <div className="px-4 pt-4 pb-5 space-y-6 border-t border-line-soft bg-bg/40">
+    <div className="px-3 sm:px-4 pt-4 pb-5 space-y-6 border-t border-line-soft bg-bg/40">
       {/* Win Probability */}
       <div>
         <p className="text-[11px] text-ink-muted uppercase tracking-wider mb-3 font-semibold">
@@ -129,18 +128,18 @@ function RaceChart({ race }: { race: Race }) {
         </p>
         <ResponsiveContainer width="100%" height={chartH}>
           <BarChart data={probData} layout="vertical"
-            margin={{ left: 0, right: 52, top: 2, bottom: 0 }}>
+            margin={{ left: 0, right: 48, top: 2, bottom: 0 }}>
             <XAxis type="number"
               domain={[0, Math.max(...probData.map(d => d.prob)) * 1.2]}
               tick={{ fill: C.axis, fontSize: 10 }}
               tickFormatter={v => `${v}%`} />
-            <YAxis type="category" dataKey="name" width={95}
-              tick={{ fill: C.axisLabel, fontSize: 12 }} />
+            <YAxis type="category" dataKey="name" width={82}
+              tick={{ fill: C.axisLabel, fontSize: 11 }} />
             <Tooltip formatter={(v) => [`${v}%`, "Win Prob"]}
               contentStyle={tooltipStyle} labelStyle={{ color: "#e8eaed" }}
               cursor={{ fill: "rgba(255,255,255,0.03)" }} />
             <Bar dataKey="prob" radius={[0, 4, 4, 0]}
-              label={{ position: "right", fill: C.axisLabel, fontSize: 11,
+              label={{ position: "right", fill: C.axisLabel, fontSize: 10,
                 formatter: (v: unknown) => `${v}%` }}>
               {probData.map((e, i) => (
                 <Cell key={i} fill={e.isBest ? C.accent : C.info} fillOpacity={e.isBest ? 1 : 0.8} />
@@ -150,7 +149,7 @@ function RaceChart({ race }: { race: Race }) {
         </ResponsiveContainer>
       </div>
 
-      {/* Expected Value (only when odds are published) */}
+      {/* Expected Value */}
       {evData.length > 0 && (
         <div>
           <p className="text-[11px] text-ink-muted uppercase tracking-wider mb-3 font-semibold">
@@ -158,18 +157,18 @@ function RaceChart({ race }: { race: Race }) {
           </p>
           <ResponsiveContainer width="100%" height={chartH}>
             <BarChart data={evData} layout="vertical"
-              margin={{ left: 0, right: 52, top: 2, bottom: 0 }}>
+              margin={{ left: 0, right: 48, top: 2, bottom: 0 }}>
               <XAxis type="number" tick={{ fill: C.axis, fontSize: 10 }}
                 tickFormatter={v => v > 0 ? `+${v}` : `${v}`} />
-              <YAxis type="category" dataKey="name" width={95}
-                tick={{ fill: C.axisLabel, fontSize: 12 }} />
+              <YAxis type="category" dataKey="name" width={82}
+                tick={{ fill: C.axisLabel, fontSize: 11 }} />
               <ReferenceLine x={0} stroke="#3a4250" />
               <Tooltip
                 formatter={(v) => [typeof v === "number" ? (v >= 0 ? `+${v.toFixed(3)}` : v.toFixed(3)) : v, "EV"]}
                 contentStyle={tooltipStyle} labelStyle={{ color: "#e8eaed" }}
                 cursor={{ fill: "rgba(255,255,255,0.03)" }} />
               <Bar dataKey="ev" radius={[0, 4, 4, 0]}
-                label={{ position: "right", fill: C.axisLabel, fontSize: 11,
+                label={{ position: "right", fill: C.axisLabel, fontSize: 10,
                   formatter: (v: unknown) => typeof v === "number" ? (v >= 0 ? `+${v.toFixed(2)}` : v.toFixed(2)) : "" }}>
                 {evData.map((e, i) => (
                   <Cell key={i} fill={e.ev > 0 ? C.accent : C.danger} fillOpacity={0.85} />
@@ -186,7 +185,7 @@ function RaceChart({ race }: { race: Race }) {
 function ProbBar({ value, best }: { value: number; best?: boolean }) {
   const width = Math.round(value * 100)
   return (
-    <div className="flex items-center gap-2 min-w-[96px]">
+    <div className="flex items-center gap-2 min-w-[80px] flex-1">
       <div className="flex-1 bg-bg rounded-full h-1.5 overflow-hidden">
         <div
           className="h-1.5 rounded-full transition-all"
@@ -198,7 +197,7 @@ function ProbBar({ value, best }: { value: number; best?: boolean }) {
           }}
         />
       </div>
-      <span className="text-xs font-mono w-11 text-right text-ink">{pct(value)}</span>
+      <span className="text-xs font-mono w-10 text-right text-ink shrink-0">{pct(value)}</span>
     </div>
   )
 }
@@ -222,8 +221,8 @@ function RaceCard({ race }: { race: Race }) {
       hasBet ? "ring-1 ring-accent/20" : "",
     ].join(" ")}>
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-line-soft bg-surface-2/60">
-        <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
+      <div className="flex items-center justify-between gap-2 px-3 sm:px-4 py-3 border-b border-line-soft bg-surface-2/60">
+        <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <span className="inline-flex items-center justify-center min-w-[2rem] h-7 px-2 rounded-lg bg-bg border border-line text-ink font-semibold text-sm">
             R{race.race_no}
           </span>
@@ -240,11 +239,11 @@ function RaceCard({ race }: { race: Race }) {
             <span className="text-ink-dim text-xs hidden sm:inline">· {race.course}</span>
           )}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={() => setShowChart(v => !v)}
             className={[
-              "inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors",
+              "inline-flex items-center gap-1 sm:gap-1.5 text-xs px-2 sm:px-2.5 py-1.5 rounded-lg border transition-colors",
               showChart
                 ? "bg-info/15 border-info/40 text-info"
                 : "bg-bg border-line text-ink-muted hover:text-ink hover:border-line",
@@ -254,7 +253,7 @@ function RaceCard({ race }: { race: Race }) {
             <span className="hidden sm:inline">{showChart ? "Table" : "Chart"}</span>
           </button>
           {hasBet ? (
-            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-accent/15 text-accent border border-accent/30">
+            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 sm:px-2.5 py-1.5 rounded-lg bg-accent/15 text-accent border border-accent/30">
               <TargetIcon className="text-sm" /> BET
             </span>
           ) : (
@@ -265,10 +264,10 @@ function RaceCard({ race }: { race: Race }) {
 
       {/* Sort controls (table view only) */}
       {!showChart && (
-        <div className="flex items-center gap-1.5 px-4 py-2 border-b border-line-soft text-[11px] text-ink-dim">
-          <span className="uppercase tracking-wider mr-1">Sort</span>
+        <div className="flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-2 border-b border-line-soft text-[11px] text-ink-dim overflow-x-auto">
+          <span className="uppercase tracking-wider mr-1 shrink-0">Sort</span>
           {([
-            ["model", "Model rank"],
+            ["model", "Model"],
             ["win", "Win %"],
             ...(oddsAvailable ? [["ev", "EV"] as [SortKey, string]] : []),
           ] as [SortKey, string][]).map(([key, label]) => (
@@ -276,7 +275,7 @@ function RaceCard({ race }: { race: Race }) {
               key={key}
               onClick={() => setSort(key)}
               className={[
-                "px-2 py-0.5 rounded-md transition-colors",
+                "px-2 py-0.5 rounded-md transition-colors whitespace-nowrap",
                 sort === key
                   ? "bg-surface-2 text-ink border border-line"
                   : "text-ink-muted hover:text-ink border border-transparent",
@@ -293,106 +292,160 @@ function RaceCard({ race }: { race: Race }) {
 
       {/* Table view */}
       {!showChart && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-line-soft text-ink-dim text-[11px] uppercase tracking-wider">
-                <th className="text-left px-4 py-2 font-medium">Horse</th>
-                <th className="text-center px-2 py-2 font-medium hidden sm:table-cell">Draw</th>
-                <th className="text-center px-2 py-2 font-medium hidden md:table-cell">Jockey</th>
-                <th className="px-4 py-2 font-medium">Win %</th>
-                <th className="text-center px-2 py-2 font-medium">Odds</th>
-                {oddsAvailable && (
-                  <>
-                    <th className="text-center px-2 py-2 font-medium">EV</th>
-                    <th className="text-center px-2 py-2 font-medium hidden sm:table-cell">Stake</th>
-                    <th className="text-center px-2 py-2 font-medium">Bet?</th>
-                  </>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {horses.map((horse) => {
-                const isBest = horse.name === race.best_bet
-                return (
-                  <tr
-                    key={horse.name}
-                    className={[
-                      "border-b border-line-soft/60 transition-colors",
-                      isBest
-                        ? "bg-accent/[0.07] hover:bg-accent/[0.1]"
-                        : "hover:bg-surface-2/50",
-                    ].join(" ")}
-                  >
-                    <td className="px-4 py-2.5 font-medium text-ink">
-                      <div className="flex items-center gap-2">
-                        {isBest && (
-                          <StarFilledIcon className="text-accent text-sm shrink-0" />
-                        )}
-                        {horse.horse_no != null && (
-                          <span className="inline-flex items-center justify-center w-5 h-5 shrink-0 rounded bg-surface-2 border border-line text-ink-muted text-[11px] font-semibold tabular-nums">
-                            {horse.horse_no}
-                          </span>
-                        )}
-                        <div className="min-w-0">
-                          <div className="truncate">{horse.name}</div>
-                          {horse.name_ch && (
-                            <div className="text-ink-dim text-xs font-normal truncate">{horse.name_ch}</div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="text-center px-2 py-2.5 text-ink-muted hidden sm:table-cell">
-                      {horse.draw ?? "—"}
-                    </td>
-                    <td className="text-center px-2 py-2.5 text-xs hidden md:table-cell">
-                      {horse.jockey_ch || horse.jockey
-                        ? (
-                          <div>
-                            {horse.jockey_ch && <div className="text-ink-muted">{horse.jockey_ch}</div>}
-                            {horse.jockey && <div className="text-ink-dim">{horse.jockey}</div>}
-                          </div>
-                        )
-                        : <span className="text-ink-dim">—</span>
-                      }
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <ProbBar value={horse.win_prob} best={isBest} />
-                    </td>
-                    <td className="text-center px-2 py-2.5 text-ink-muted">
-                      {horse.win_odds != null ? horse.win_odds.toFixed(1) : (
-                        <span className="text-ink-dim">—</span>
+        <>
+          {/* ── Mobile card list (< sm) ── */}
+          <div className="block sm:hidden divide-y divide-line-soft">
+            {horses.map((horse) => {
+              const isBest = horse.name === race.best_bet
+              return (
+                <div
+                  key={horse.name}
+                  className={[
+                    "px-4 py-3",
+                    isBest ? "bg-accent/[0.07]" : "",
+                  ].join(" ")}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {isBest && <StarFilledIcon className="text-accent text-sm shrink-0" />}
+                      {horse.horse_no != null && (
+                        <span className="inline-flex items-center justify-center w-5 h-5 shrink-0 rounded bg-surface-2 border border-line text-ink-muted text-[11px] font-semibold tabular-nums">
+                          {horse.horse_no}
+                        </span>
                       )}
-                    </td>
-                    {oddsAvailable && (
-                      <>
-                        <td className={`text-center px-2 py-2.5 font-mono text-xs ${evColor(horse.expected_value)}`}>
-                          {horse.expected_value != null
-                            ? (horse.expected_value >= 0 ? "+" : "") + horse.expected_value.toFixed(3)
-                            : "—"}
-                        </td>
-                        <td className="text-center px-2 py-2.5 text-ink-muted font-mono text-xs hidden sm:table-cell">
-                          {horse.bet_fraction != null && horse.bet_fraction > 0
-                            ? horse.bet_fraction.toFixed(1) + "%"
-                            : "—"}
-                        </td>
-                        <td className="text-center px-2 py-2.5">
-                          {horse.should_bet ? (
-                            <span className="inline-flex items-center gap-1 bg-accent/15 text-accent border border-accent/30 text-[11px] font-bold px-2 py-0.5 rounded-md">
-                              <CheckIcon className="text-xs" /> BET
-                            </span>
-                          ) : (
-                            <span className="text-ink-dim text-xs">—</span>
-                          )}
-                        </td>
-                      </>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-ink truncate">{horse.name}</div>
+                        {horse.name_ch && (
+                          <div className="text-xs text-ink-dim">{horse.name_ch}</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      {horse.should_bet && (
+                        <span className="inline-flex items-center gap-1 bg-accent/15 text-accent border border-accent/30 text-[11px] font-bold px-2 py-0.5 rounded-md">
+                          <CheckIcon className="text-xs" /> BET
+                        </span>
+                      )}
+                      {horse.win_odds != null && (
+                        <span className="text-xs text-ink-muted tabular-nums">@{horse.win_odds.toFixed(1)}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <ProbBar value={horse.win_prob} best={isBest} />
+                    {horse.expected_value != null && (
+                      <span className={`text-xs font-mono shrink-0 ${evColor(horse.expected_value)}`}>
+                        EV {horse.expected_value >= 0 ? "+" : ""}{horse.expected_value.toFixed(2)}
+                      </span>
                     )}
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* ── Desktop table (>= sm) ── */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line-soft text-ink-dim text-[11px] uppercase tracking-wider">
+                  <th className="text-left px-4 py-2 font-medium">Horse</th>
+                  <th className="text-center px-2 py-2 font-medium hidden sm:table-cell">Draw</th>
+                  <th className="text-center px-2 py-2 font-medium hidden md:table-cell">Jockey</th>
+                  <th className="px-4 py-2 font-medium">Win %</th>
+                  <th className="text-center px-2 py-2 font-medium">Odds</th>
+                  {oddsAvailable && (
+                    <>
+                      <th className="text-center px-2 py-2 font-medium">EV</th>
+                      <th className="text-center px-2 py-2 font-medium hidden sm:table-cell">Stake</th>
+                      <th className="text-center px-2 py-2 font-medium">Bet?</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {horses.map((horse) => {
+                  const isBest = horse.name === race.best_bet
+                  return (
+                    <tr
+                      key={horse.name}
+                      className={[
+                        "border-b border-line-soft/60 transition-colors",
+                        isBest
+                          ? "bg-accent/[0.07] hover:bg-accent/[0.1]"
+                          : "hover:bg-surface-2/50",
+                      ].join(" ")}
+                    >
+                      <td className="px-4 py-2.5 font-medium text-ink">
+                        <div className="flex items-center gap-2">
+                          {isBest && (
+                            <StarFilledIcon className="text-accent text-sm shrink-0" />
+                          )}
+                          {horse.horse_no != null && (
+                            <span className="inline-flex items-center justify-center w-5 h-5 shrink-0 rounded bg-surface-2 border border-line text-ink-muted text-[11px] font-semibold tabular-nums">
+                              {horse.horse_no}
+                            </span>
+                          )}
+                          <div className="min-w-0">
+                            <div className="truncate">{horse.name}</div>
+                            {horse.name_ch && (
+                              <div className="text-ink-dim text-xs font-normal truncate">{horse.name_ch}</div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="text-center px-2 py-2.5 text-ink-muted hidden sm:table-cell">
+                        {horse.draw ?? "—"}
+                      </td>
+                      <td className="text-center px-2 py-2.5 text-xs hidden md:table-cell">
+                        {horse.jockey_ch || horse.jockey
+                          ? (
+                            <div>
+                              {horse.jockey_ch && <div className="text-ink-muted">{horse.jockey_ch}</div>}
+                              {horse.jockey && <div className="text-ink-dim">{horse.jockey}</div>}
+                            </div>
+                          )
+                          : <span className="text-ink-dim">—</span>
+                        }
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <ProbBar value={horse.win_prob} best={isBest} />
+                      </td>
+                      <td className="text-center px-2 py-2.5 text-ink-muted">
+                        {horse.win_odds != null ? horse.win_odds.toFixed(1) : (
+                          <span className="text-ink-dim">—</span>
+                        )}
+                      </td>
+                      {oddsAvailable && (
+                        <>
+                          <td className={`text-center px-2 py-2.5 font-mono text-xs ${evColor(horse.expected_value)}`}>
+                            {horse.expected_value != null
+                              ? (horse.expected_value >= 0 ? "+" : "") + horse.expected_value.toFixed(3)
+                              : "—"}
+                          </td>
+                          <td className="text-center px-2 py-2.5 text-ink-muted font-mono text-xs hidden sm:table-cell">
+                            {horse.bet_fraction != null && horse.bet_fraction > 0
+                              ? horse.bet_fraction.toFixed(1) + "%"
+                              : "—"}
+                          </td>
+                          <td className="text-center px-2 py-2.5">
+                            {horse.should_bet ? (
+                              <span className="inline-flex items-center gap-1 bg-accent/15 text-accent border border-accent/30 text-[11px] font-bold px-2 py-0.5 rounded-md">
+                                <CheckIcon className="text-xs" /> BET
+                              </span>
+                            ) : (
+                              <span className="text-ink-dim text-xs">—</span>
+                            )}
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {/* Best bet callout */}
@@ -400,10 +453,11 @@ function RaceCard({ race }: { race: Race }) {
         const best = race.horses.find((h) => h.name === race.best_bet)
         if (!best) return null
         return (
-          <div className="px-4 py-3 bg-accent/[0.06] border-t border-accent/15 flex items-center justify-between gap-3">
+          <div className="px-3 sm:px-4 py-3 bg-accent/[0.06] border-t border-accent/15 flex items-start sm:items-center justify-between gap-3">
             <div className="min-w-0">
-              <span className="inline-flex items-center gap-1.5 text-accent font-semibold">
-                <StarFilledIcon className="text-sm shrink-0" /> {best.horse_no != null ? `#${best.horse_no} ` : ""}{best.name}
+              <span className="inline-flex items-center gap-1.5 text-accent font-semibold text-sm">
+                <StarFilledIcon className="text-sm shrink-0" />
+                {best.horse_no != null ? `#${best.horse_no} ` : ""}{best.name}
               </span>
               {best.name_ch && (
                 <span className="text-accent-strong text-sm ml-1.5">{best.name_ch}</span>
@@ -424,9 +478,9 @@ function RaceCard({ race }: { race: Race }) {
         )
       })()}
 
-      {/* Odds not yet available notice */}
+      {/* Odds not yet available */}
       {!oddsAvailable && (
-        <div className="px-4 py-2 bg-warn/[0.06] border-t border-warn/15 text-warn/90 text-xs flex items-center gap-1.5">
+        <div className="px-3 sm:px-4 py-2 bg-warn/[0.06] border-t border-warn/15 text-warn/90 text-xs flex items-center gap-1.5">
           <AlertIcon className="text-sm shrink-0" />
           Odds not yet published — probabilities only. Re-fetch once HKJC posts odds.
         </div>
@@ -434,7 +488,7 @@ function RaceCard({ race }: { race: Race }) {
 
       {/* QPL section */}
       {race.qpl_bets && race.qpl_bets.length > 0 && (
-        <div className="border-t border-line-soft px-4 py-3">
+        <div className="border-t border-line-soft px-3 sm:px-4 py-3">
           <div className="flex items-center gap-2 mb-2.5">
             <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand uppercase tracking-wider">
               <LayersIcon className="text-sm" /> Quinella Place
@@ -450,19 +504,19 @@ function RaceCard({ race }: { race: Race }) {
               <div
                 key={i}
                 className={[
-                  "flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm",
+                  "flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm",
                   qb.should_bet
                     ? "bg-brand/[0.1] border border-brand/30"
                     : "bg-surface-2/50 border border-transparent",
                 ].join(" ")}
               >
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-wrap">
                   {qb.should_bet && <StarFilledIcon className="text-brand text-xs shrink-0" />}
-                  <span className="font-medium text-ink truncate">{qb.horse_a}</span>
+                  <span className="font-medium text-ink text-xs sm:text-sm truncate">{qb.horse_a}</span>
                   <span className="text-ink-dim text-xs">+</span>
-                  <span className="font-medium text-ink truncate">{qb.horse_b}</span>
+                  <span className="font-medium text-ink text-xs sm:text-sm truncate">{qb.horse_b}</span>
                 </div>
-                <div className="flex items-center gap-3 text-xs font-mono shrink-0">
+                <div className="flex items-center gap-2 sm:gap-3 text-xs font-mono shrink-0">
                   <span className="text-ink-muted">
                     {(qb.qpl_prob * 100).toFixed(1)}%
                   </span>
@@ -520,7 +574,6 @@ export default function Dashboard() {
   const [betsOnly, setBetsOnly] = useState(false)
   const [view, setView] = useState<"model" | "stake">("model")
 
-  // Auto-detect next meeting on mount
   useEffect(() => {
     apiFetch("/next-meeting")
       .then((data) => {
@@ -538,7 +591,6 @@ export default function Dashboard() {
     setError("")
     setStatus("Waking up prediction server…")
 
-    // Poll /api/wake until Render is ready (cold start can take 60-90s)
     let ready = false
     for (let i = 0; i < 24 && !ready; i++) {
       try {
@@ -593,89 +645,113 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen">
-      {/* ── Top bar ─────────────────────────────────────────────────── */}
+      {/* ── Top bar ─────────────────────────────────────────────── */}
       <header className="sticky top-0 z-20 bg-surface/85 backdrop-blur-md border-b border-line">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center gap-3">
-          <span className="text-base font-semibold text-ink flex items-center gap-2">
-            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-surface-2 border border-line text-accent">
-              <TrophyIcon className="text-base" />
-            </span>
-            HKJC Predictor
-          </span>
+        <div className="max-w-5xl mx-auto px-4 py-3 space-y-2 sm:space-y-0">
 
-          <div className="flex items-center gap-2 ml-1">
-            <div className="relative">
-              <CalendarIcon className="text-sm text-ink-dim absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="date"
-                value={meetingDate}
-                onChange={(e) => setMeetingDate(e.target.value)}
-                className="field pl-8 pr-3 py-1.5 text-sm"
-              />
-            </div>
-            <select
-              value={venue}
-              onChange={(e) => setVenue(e.target.value)}
-              className="field px-3 py-1.5 text-sm cursor-pointer"
-            >
-              <option value="ST">Sha Tin (ST)</option>
-              <option value="HV">Happy Valley (HV)</option>
-            </select>
-          </div>
-
-          <button
-            onClick={fetchPredictions}
-            disabled={loading || !meetingDate}
-            className="btn-accent px-4 py-1.5 text-sm flex items-center gap-2"
-          >
-            {loading ? (
-              <>
-                <SpinnerIcon className="text-base animate-spin-smooth" />
-                <span className="max-w-[180px] truncate">{status || "Fetching…"}</span>
-              </>
-            ) : (
-              <>
-                <RefreshIcon className="text-base" /> Fetch
-              </>
-            )}
-          </button>
-
-          <div className="ml-auto flex items-center gap-3">
-            {lastFetched && (
-              <span className="text-ink-dim text-xs hidden sm:block">
-                Updated {lastFetched}
+          {/* Mobile-only: brand + logout on their own row */}
+          <div className="flex items-center justify-between sm:hidden">
+            <span className="text-base font-semibold text-ink flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-surface-2 border border-line text-accent">
+                <TrophyIcon className="text-base" />
               </span>
-            )}
+              HKJC Predictor
+            </span>
             <button
               onClick={handleLogout}
               className="inline-flex items-center gap-1.5 text-ink-muted hover:text-ink text-sm transition-colors"
             >
               <LogoutIcon className="text-base" />
-              <span className="hidden sm:inline">Logout</span>
             </button>
+          </div>
+
+          {/* Controls row (all screens) */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Brand — desktop only */}
+            <span className="hidden sm:inline-flex text-base font-semibold text-ink items-center gap-2 mr-1">
+              <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-surface-2 border border-line text-accent">
+                <TrophyIcon className="text-base" />
+              </span>
+              HKJC Predictor
+            </span>
+
+            {/* Date + venue */}
+            <div className="flex items-center gap-2 flex-1 sm:flex-initial">
+              <div className="relative flex-1 sm:flex-initial">
+                <CalendarIcon className="text-sm text-ink-dim absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="date"
+                  value={meetingDate}
+                  onChange={(e) => setMeetingDate(e.target.value)}
+                  className="field pl-8 pr-2 py-1.5 text-sm w-full"
+                />
+              </div>
+              <select
+                value={venue}
+                onChange={(e) => setVenue(e.target.value)}
+                className="field px-2.5 py-1.5 text-sm cursor-pointer w-20 sm:w-auto"
+              >
+                <option value="ST">ST</option>
+                <option value="HV">HV</option>
+              </select>
+            </div>
+
+            {/* Fetch */}
+            <button
+              onClick={fetchPredictions}
+              disabled={loading || !meetingDate}
+              className="btn-accent px-4 py-1.5 text-sm flex items-center justify-center gap-2 flex-1 sm:flex-initial"
+            >
+              {loading ? (
+                <>
+                  <SpinnerIcon className="text-base animate-spin-smooth shrink-0" />
+                  <span className="truncate max-w-[150px]">{status || "Fetching…"}</span>
+                </>
+              ) : (
+                <>
+                  <RefreshIcon className="text-base" /> Fetch
+                </>
+              )}
+            </button>
+
+            {/* Desktop: last fetched + logout */}
+            <div className="ml-auto hidden sm:flex items-center gap-3">
+              {lastFetched && (
+                <span className="text-ink-dim text-xs">Updated {lastFetched}</span>
+              )}
+              <button
+                onClick={handleLogout}
+                className="inline-flex items-center gap-1.5 text-ink-muted hover:text-ink text-sm transition-colors"
+              >
+                <LogoutIcon className="text-base" />
+                <span>Logout</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* ── Body ────────────────────────────────────────────────────── */}
-      <main className="max-w-5xl mx-auto px-4 py-6 space-y-4">
-        {/* ── View tabs ───────────────────────────────────────────────── */}
+      {/* ── Body ────────────────────────────────────────────────── */}
+      <main className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4">
+
+        {/* ── View tabs ─────────────────────────────────────────── */}
         <div className="flex items-center gap-1 p-1 rounded-xl bg-surface-2 border border-line w-fit animate-fade-up">
           {([
             ["model", "Model"],
-            ["stake", "Stake · RaceLab"],
+            ["stake", "Stake"],
           ] as const).map(([key, label]) => (
             <button
               key={key}
               onClick={() => setView(key)}
               className={[
-                "px-4 py-1.5 text-sm rounded-lg transition-colors",
+                "px-3 sm:px-4 py-1.5 text-sm rounded-lg transition-colors",
                 view === key
                   ? "bg-accent/15 text-accent font-medium"
                   : "text-ink-muted hover:text-ink",
               ].join(" ")}
             >
               {label}
+              {key === "stake" && <span className="hidden sm:inline"> · RaceLab</span>}
             </button>
           ))}
         </div>
@@ -685,89 +761,93 @@ export default function Dashboard() {
         )}
 
         {view === "model" && (<>
-        {/* Summary bar */}
-        {result && (
-          <div className="surface-card px-5 py-4 flex flex-wrap items-center gap-x-8 gap-y-4 animate-fade-up">
-            <StatCard
-              label="Meeting"
-              value={<span className="text-sm">{result.date} · {result.venue}</span>}
-            />
-            <StatCard label="Races" value={result.races.length} />
-            <StatCard label="Win bets" value={betsTotal} tone={betsTotal > 0 ? "accent" : undefined} />
-            <StatCard label="QPL bets" value={qplTotal > 0 ? qplTotal : "—"} tone={qplTotal > 0 ? "brand" : undefined} />
+          {/* Summary bar */}
+          {result && (
+            <div className="surface-card px-4 sm:px-5 py-4 animate-fade-up">
+              {/* Stats: 2-col grid on mobile, flex row on desktop */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:flex sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-4">
+                <StatCard
+                  label="Meeting"
+                  value={<span className="text-sm">{result.date} · {result.venue}</span>}
+                />
+                <StatCard label="Races" value={result.races.length} />
+                <StatCard label="Win bets" value={betsTotal} tone={betsTotal > 0 ? "accent" : undefined} />
+                <StatCard label="QPL bets" value={qplTotal > 0 ? qplTotal : "—"} tone={qplTotal > 0 ? "brand" : undefined} />
 
-            <div className="ml-auto flex items-center gap-3">
-              {!oddsReady && (
-                <span className="chip text-warn border-warn/30">
-                  <AlertIcon className="text-sm" /> Odds pending
-                </span>
-              )}
-              <button
-                onClick={() => setBetsOnly((v) => !v)}
-                className={[
-                  "inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors",
-                  betsOnly
-                    ? "bg-accent/15 border-accent/30 text-accent"
-                    : "bg-bg border-line text-ink-muted hover:text-ink",
-                ].join(" ")}
-              >
-                <FilterIcon className="text-sm" />
-                {betsOnly ? "Bets only" : "All races"}
-              </button>
+                {/* Filter + odds badge: full-width in grid, auto-right in flex */}
+                <div className="col-span-2 sm:ml-auto flex items-center gap-3 pt-2 sm:pt-0 border-t border-line-soft sm:border-0">
+                  {!oddsReady && (
+                    <span className="chip text-warn border-warn/30">
+                      <AlertIcon className="text-sm" /> Odds pending
+                    </span>
+                  )}
+                  <button
+                    onClick={() => setBetsOnly((v) => !v)}
+                    className={[
+                      "inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ml-auto sm:ml-0",
+                      betsOnly
+                        ? "bg-accent/15 border-accent/30 text-accent"
+                        : "bg-bg border-line text-ink-muted hover:text-ink",
+                    ].join(" ")}
+                  >
+                    <FilterIcon className="text-sm" />
+                    {betsOnly ? "Bets only" : "All races"}
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Error */}
-        {error && (
-          <div className="surface-card border-danger/30 bg-danger/[0.06] text-danger px-4 py-3 text-sm flex items-center gap-2">
-            <AlertIcon className="text-base shrink-0" /> {error}
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!result && !loading && !error && (
-          <div className="text-center py-24 animate-fade-up">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-surface-2 border border-line text-accent mb-5">
-              <TrophyIcon className="text-3xl" />
+          {/* Error */}
+          {error && (
+            <div className="surface-card border-danger/30 bg-danger/[0.06] text-danger px-4 py-3 text-sm flex items-center gap-2">
+              <AlertIcon className="text-base shrink-0" /> {error}
             </div>
-            <p className="text-lg text-ink">
-              Select a date and click <strong className="text-accent font-semibold">Fetch</strong>
-            </p>
-            <p className="text-sm mt-1.5 text-ink-muted">
-              Race cards are usually published the day before the meeting.
-            </p>
-          </div>
-        )}
+          )}
 
-        {/* Loading skeleton */}
-        {loading && !result && (
-          <div className="text-center py-24 text-ink-muted animate-fade-up">
-            <SpinnerIcon className="text-4xl text-accent animate-spin-smooth mx-auto mb-4" />
-            <p className="text-sm">{status || "Loading…"}</p>
-          </div>
-        )}
+          {/* Empty state */}
+          {!result && !loading && !error && (
+            <div className="text-center py-20 sm:py-24 animate-fade-up">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-surface-2 border border-line text-accent mb-5">
+                <TrophyIcon className="text-3xl" />
+              </div>
+              <p className="text-lg text-ink">
+                Select a date and tap <strong className="text-accent font-semibold">Fetch</strong>
+              </p>
+              <p className="text-sm mt-1.5 text-ink-muted">
+                Race cards are usually published the day before the meeting.
+              </p>
+            </div>
+          )}
 
-        {/* Message from API (e.g. no races found) */}
-        {result?.message && (
-          <div className="surface-card border-warn/25 bg-warn/[0.06] text-warn px-4 py-3 text-sm flex items-center gap-2">
-            <AlertIcon className="text-base shrink-0" /> {result.message}
-          </div>
-        )}
+          {/* Loading skeleton */}
+          {loading && !result && (
+            <div className="text-center py-20 sm:py-24 text-ink-muted animate-fade-up">
+              <SpinnerIcon className="text-4xl text-accent animate-spin-smooth mx-auto mb-4" />
+              <p className="text-sm">{status || "Loading…"}</p>
+            </div>
+          )}
 
-        {/* Bets-only empty */}
-        {result && betsOnly && visibleRaces.length === 0 && (
-          <div className="text-center py-16 text-ink-muted">
-            No qualifying bets in this meeting. Toggle back to <strong className="text-ink">All races</strong> to view every card.
-          </div>
-        )}
+          {/* Message from API */}
+          {result?.message && (
+            <div className="surface-card border-warn/25 bg-warn/[0.06] text-warn px-4 py-3 text-sm flex items-center gap-2">
+              <AlertIcon className="text-base shrink-0" /> {result.message}
+            </div>
+          )}
 
-        {/* Race cards */}
-        <div className="space-y-4">
-          {visibleRaces.map((race) => (
-            <RaceCard key={race.race_no} race={race} />
-          ))}
-        </div>
+          {/* Bets-only empty */}
+          {result && betsOnly && visibleRaces.length === 0 && (
+            <div className="text-center py-16 text-ink-muted">
+              No qualifying bets in this meeting. Toggle back to <strong className="text-ink">All races</strong> to view every card.
+            </div>
+          )}
+
+          {/* Race cards */}
+          <div className="space-y-4">
+            {visibleRaces.map((race) => (
+              <RaceCard key={race.race_no} race={race} />
+            ))}
+          </div>
         </>)}
       </main>
     </div>
