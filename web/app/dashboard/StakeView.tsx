@@ -5,7 +5,7 @@ import {
   RefreshIcon, SpinnerIcon, AlertIcon, StarFilledIcon, TargetIcon,
 } from "../components/icons"
 
-// ── Types (mirror of /api/stake response) ──────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────
 
 interface StakeTip {
   rank: number
@@ -44,7 +44,6 @@ interface StakeResponse {
   note?: string
 }
 
-// Minimal shape of the model result we compare against.
 interface ModelHorse {
   name: string
   win_prob: number
@@ -65,7 +64,6 @@ function norm(name: string): string {
   return name.toUpperCase().replace(/[^A-Z0-9]/g, "")
 }
 
-// EV from model win prob vs Stake decimal win odds: prob * odds − 1
 function edge(prob: number | undefined, odds: number | null): number | null {
   if (prob == null || odds == null || odds <= 0) return null
   return prob * odds - 1
@@ -106,13 +104,11 @@ export default function StakeView({
     }
   }, [date, venue])
 
-  // auto-load when the tab first shows for a given date/venue
   useEffect(() => {
     if (date && !data && !loading) load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, venue])
 
-  // model lookup: race_no -> normalized horse name -> { prob, isBest, shouldBet }
   const modelByRace = useMemo(() => {
     const map = new Map<number, Map<string, { prob: number; isBest: boolean; shouldBet: boolean }>>()
     if (!model) return map
@@ -133,13 +129,11 @@ export default function StakeView({
 
   return (
     <div className="space-y-4">
-      {/* control bar */}
-      <div className="surface-card px-5 py-4 flex flex-wrap items-center gap-x-6 gap-y-3 animate-fade-up">
+      {/* Control bar */}
+      <div className="surface-card px-4 sm:px-5 py-4 flex flex-wrap items-center gap-x-6 gap-y-3 animate-fade-up">
         <div>
           <div className="text-[11px] uppercase tracking-wide text-ink-dim">Source</div>
-          <div className="text-sm text-ink font-medium">
-            Stake · RaceLab tips & odds
-          </div>
+          <div className="text-sm text-ink font-medium">Stake · RaceLab tips &amp; odds</div>
         </div>
         {data && !data.error && (
           <div>
@@ -164,7 +158,7 @@ export default function StakeView({
         </button>
       </div>
 
-      {/* explainer */}
+      {/* Explainer */}
       <p className="text-xs text-ink-dim px-1 -mt-1">
         Win % is from your model. <span className="text-accent">Edge</span> = model win % × Stake win odds − 1
         (positive ⇒ Stake is paying more than your model thinks the horse is worth).
@@ -203,28 +197,28 @@ export default function StakeView({
           topTip && modelBest && norm(topTip.name) !== norm(modelBest)
         return (
           <div key={race.raceNo} className="surface-card overflow-hidden animate-fade-up">
-            {/* race header */}
-            <div className="px-5 py-3 border-b border-line flex flex-wrap items-center gap-3">
+            {/* Race header */}
+            <div className="px-4 sm:px-5 py-3 border-b border-line flex flex-wrap items-center gap-3">
               <span className="inline-flex items-center justify-center min-w-7 h-7 px-2 rounded-lg bg-surface-2 border border-line text-accent text-sm font-semibold tabular-nums">
                 R{race.raceNo}
               </span>
-              <span className="text-sm text-ink font-medium">
+              <span className="text-sm text-ink font-medium truncate min-w-0">
                 {race.title || "Race " + race.raceNo}
               </span>
               <a
                 href={race.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="ml-auto text-xs text-ink-dim hover:text-accent transition-colors"
+                className="ml-auto text-xs text-ink-dim hover:text-accent transition-colors shrink-0"
               >
-                View on Stake ↗
+                Stake ↗
               </a>
             </div>
 
             {/* RaceLab tips */}
             {race.tips.length > 0 && (
-              <div className="px-5 py-3 border-b border-line bg-bg/40">
-                <div className="flex items-center gap-2 mb-2">
+              <div className="px-4 sm:px-5 py-3 border-b border-line bg-bg/40">
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
                   <TargetIcon className="text-brand text-sm" />
                   <span className="text-[11px] uppercase tracking-wide text-ink-dim">RaceLab tips</span>
                   {disagree && (
@@ -260,16 +254,18 @@ export default function StakeView({
               </div>
             )}
 
-            {/* runners + odds + edge */}
+            {/* Runners table */}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-[11px] uppercase tracking-wide text-ink-dim border-b border-line">
                     <th className="text-left font-medium px-3 py-2">#</th>
                     <th className="text-left font-medium px-3 py-2">Horse</th>
-                    <th className="text-right font-medium px-3 py-2">Dr</th>
+                    {/* Draw: hidden on mobile */}
+                    <th className="text-right font-medium px-3 py-2 hidden sm:table-cell">Dr</th>
                     <th className="text-right font-medium px-3 py-2">Win</th>
-                    <th className="text-right font-medium px-3 py-2">Plc</th>
+                    {/* Place: hidden on mobile */}
+                    <th className="text-right font-medium px-3 py-2 hidden sm:table-cell">Plc</th>
                     <th className="text-right font-medium px-3 py-2">Model %</th>
                     <th className="text-right font-medium px-3 py-2">Edge</th>
                   </tr>
@@ -286,22 +282,31 @@ export default function StakeView({
                         <td className="px-3 py-2 text-ink-dim tabular-nums">{r.no ?? "—"}</td>
                         <td className="px-3 py-2">
                           <span className="inline-flex items-center gap-1.5">
-                            {mh?.isBest && <StarFilledIcon className="text-accent text-xs" />}
+                            {mh?.isBest && <StarFilledIcon className="text-accent text-xs shrink-0" />}
                             <span className={mh?.shouldBet ? "text-ink font-medium" : "text-ink"}>
                               {r.name}
                             </span>
                             {r.runStyle && r.runStyle !== "No Data" && (
-                              <span className="text-[10px] text-ink-dim border border-line rounded px-1 py-px">
+                              <span className="text-[10px] text-ink-dim border border-line rounded px-1 py-px hidden sm:inline">
                                 {r.runStyle}
                               </span>
                             )}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-right text-ink-muted tabular-nums">{r.draw ?? "—"}</td>
+                        {/* Draw: hidden on mobile */}
+                        <td className="px-3 py-2 text-right text-ink-muted tabular-nums hidden sm:table-cell">
+                          {r.draw ?? "—"}
+                        </td>
                         <td className="px-3 py-2 text-right text-ink tabular-nums">{fmtOdds(r.win)}</td>
-                        <td className="px-3 py-2 text-right text-ink-muted tabular-nums">{fmtOdds(r.place)}</td>
+                        {/* Place: hidden on mobile */}
+                        <td className="px-3 py-2 text-right text-ink-muted tabular-nums hidden sm:table-cell">
+                          {fmtOdds(r.place)}
+                        </td>
                         <td className="px-3 py-2 text-right tabular-nums">
-                          {mh ? <span className="text-ink">{(mh.prob * 100).toFixed(1)}%</span> : <span className="text-ink-dim">—</span>}
+                          {mh
+                            ? <span className="text-ink">{(mh.prob * 100).toFixed(1)}%</span>
+                            : <span className="text-ink-dim">—</span>
+                          }
                         </td>
                         <td className="px-3 py-2 text-right tabular-nums">
                           {e == null ? (
