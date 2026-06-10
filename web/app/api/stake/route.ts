@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 // ── Region pinning ──────────────────────────────────────────────────────────
-// Stake geo-blocks US IPs (returns a "restrictedRegion" shell with no race data).
-// Vercel's default region is iad1 (US). IMPORTANT: on the Hobby plan only a
-// SINGLE preferred region is allowed — passing an array (multi-region) is a
-// Pro/Enterprise feature and is silently ignored, dropping back to iad1 (US).
-// So this MUST be a single string. Hong Kong (hkg1) is the natural choice for
-// HK racing and is not geo-restricted by Stake.
+// Stake geo-blocks US IPs. Single region only on Hobby plan.
 export const preferredRegion = "hkg1"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -42,21 +37,28 @@ async function fetchHtml(url: string, timeoutMs = 18_000): Promise<string | null
   }
 }
 
-function looksGeoBlocked(html: string): boolean {
-  return /restrictedRegion|not available in your (region|country)|access from your country is restricted/i.test(
-    html
-  )
+// ── Block detection ─────────────────────────────────────────────────────────
+type BlockType = "geo" | "cloudflare" | null
+
+function detectBlock(html: string): BlockType {
+  // Cloudflare managed challenge / bot-fight mode
+  if (/Just a moment\.\.\.|cf-mitigated|_cf_challenge|challenges\.cloudflare\.com/i.test(html)) {
+    return "cloudflare"
+  }
+  // Stake geo-restriction page
+  if (/restrictedRegion|not available in your (region|country)|access from your country is restricted/i.test(html)) {
+    return "geo"
+  }
+  return null
 }
 
 // ── Meeting discovery ───────────────────────────────────────────────────────
-// Race URLs on a calendar page look like:
-//   /sports/racing/horse-racing/asia/meeting/{meetingMs}-{slug}/{raceMs}-{slug}-r{N}-{name}
 interface RaceLink {
   raceNo: number
   url: string
 }
 
-function discoverRaces(html: string, venueSlug: string, ymd: string | null): RaceLink[] {
+function discoverRaces(html: string, venueSlugPrefix: string, ymd: string | null): RaceLink[] {
   const re = new RegExp(
     "/sports/racing/horse-racing/asia/meeting/(\\d{13})-([a-z0-9-]+?)/(\\d{13})-\\2-r(\\d{1,2})-[a-z0-9-]+",
     "g"
@@ -67,9 +69,15 @@ function discoverRaces(html: string, venueSlug: string, ymd: string | null): Rac
     const meetingMs = Number(m[1])
     const slug = m[2]
     const raceNo = Number(m[4])
-    if (slug !== venueSlug) continue
+    // Flexible slug matching — slug must CONTAIN the venue keyword
+    // (handles variants like "happy-valley-hk", "sha-tin-racecourse", etc.)
+    if (!slug.includes(venueSlugPrefix)) continue
     if (ymd) {
-      const d = new Date(meetingMs)
+      // Use HKT (UTC+8) for date comparison — HV evening meetings start at
+      // ~19:00 HKT; if Stake stores the meeting timestamp as midnight HKT,
+      // that's 16:00 UTC the day before, causing a UTC date mismatch.
+      const hktMs = meetingMs + 8 * 60 * 60 * 1000
+      const d = new Date(hktMs)
       const meetingYmd = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(
         d.getUTCDate()
       ).padStart(2, "0")}`
@@ -99,7 +107,7 @@ function htmlToText(html: string): string[] {
     .filter(Boolean)
 }
 
-// ── Race page parsing (structure verified against live Stake HTML) ──────────
+// ── Race page parsing ───────────────────────────────────────────────────────
 interface Tip {
   rank: number
   no: number | null
@@ -139,7 +147,6 @@ const oddsNumRe = /^(?:OP\s*)?(\d+(?:\.\d+)?)$/
 const kgRe = /^(\d+(?:\.\d+)?)\s*kg$/i
 const indexRe = /^(\d{1,2})\.$/
 
-// title from the race-name slug: "...-r3-hku-faculties-...-hcp-c4" → readable
 function titleFromUrl(url: string, raceNo: number): string {
   const m = url.match(new RegExp(`-r${raceNo}-([a-z0-9-]+)$`))
   if (!m) return `Race ${raceNo}`
@@ -175,7 +182,6 @@ function parseTips(lines: string[], runnersIdx: number): { tips: Tip[]; comment:
 
 function parseRunners(lines: string[], runnersIdx: number): Runner[] {
   const start = runnersIdx >= 0 ? runnersIdx + 1 : 0
-  // locate each runner block start: "<n>." followed by "Name (draw)"
   const starts: number[] = []
   for (let i = start; i < lines.length; i++) {
     if (indexRe.test(lines[i]) && nameDrawRe.test(lines[i + 1] || "")) starts.push(i)
@@ -204,7 +210,6 @@ function parseRunners(lines: string[], runnersIdx: number): Runner[] {
       const wkg = l.match(kgRe); if (wkg) { weight = Number(wkg[1]); continue }
       const om = l.match(oddsNumRe); if (om) odds.push(Number(om[1]))
     }
-    // odds order on page: [OP, …history…, WIN, PLACE] → win = 2nd-last, place = last
     const op = odds.length ? odds[0] : null
     const win = odds.length >= 2 ? odds[odds.length - 2] : odds.length === 1 ? odds[0] : null
     const place = odds.length >= 2 ? odds[odds.length - 1] : null
@@ -236,32 +241,41 @@ export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams
   const date = sp.get("date")
   const venue = (sp.get("venue") || "ST").toUpperCase()
-  const venueSlug = VENUE_SLUG[venue]
+  const venueSlugPrefix = VENUE_SLUG[venue]
 
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return NextResponse.json({ error: "date (YYYY-MM-DD) required" }, { status: 400 })
   }
-  if (!venueSlug) {
+  if (!venueSlugPrefix) {
     return NextResponse.json({ error: `unknown venue: ${venue}` }, { status: 400 })
   }
 
-  // 1) discover races. Primary = the exact-date calendar page (date-scoped, so
-  //    we trust every venue-matching race on it). Fall back to today/tomorrow.
-  const primary = await fetchHtml(`${BASE}/calendar/${date}`)
-  let geoBlocked = false
+  const stakeUrl = `${BASE}/calendar/${date}`
+  let blockType: BlockType = null
   let links: RaceLink[] = []
+
+  // 1) Primary: date-scoped calendar page (no date filter needed — URL is already scoped)
+  const primary = await fetchHtml(`${BASE}/calendar/${date}`)
   if (primary) {
-    if (looksGeoBlocked(primary)) geoBlocked = true
-    links = discoverRaces(primary, venueSlug, null)
+    const detected = detectBlock(primary)
+    if (detected) blockType = detected
+    else links = discoverRaces(primary, venueSlugPrefix, null)
   }
-  if (!links.length) {
-    const alts = await Promise.allSettled(
-      [`${BASE}/calendar/today`, `${BASE}/calendar/tomorrow`].map((u) => fetchHtml(u))
-    )
+
+  // 2) Fallbacks: today, tomorrow, yesterday
+  if (!links.length && blockType !== "cloudflare") {
+    const fallbackUrls = [
+      `${BASE}/calendar/today`,
+      `${BASE}/calendar/tomorrow`,
+      `${BASE}/calendar/yesterday`,
+    ]
+    const alts = await Promise.allSettled(fallbackUrls.map((u) => fetchHtml(u)))
     for (const res of alts) {
       if (res.status === "fulfilled" && res.value) {
-        if (looksGeoBlocked(res.value)) geoBlocked = true
-        const found = discoverRaces(res.value, venueSlug, date)
+        const detected = detectBlock(res.value)
+        if (detected) { blockType = detected; break }
+        // Use HKT-aware date filter in discoverRaces
+        const found = discoverRaces(res.value, venueSlugPrefix, date)
         const seen = new Set(links.map((l) => l.raceNo))
         for (const f of found) if (!seen.has(f.raceNo)) links.push(f)
       }
@@ -269,21 +283,41 @@ export async function GET(request: NextRequest) {
     links.sort((a, b) => a.raceNo - b.raceNo)
   }
 
+  // ── Error responses ────────────────────────────────────────────────────────
   if (!links.length) {
+    if (blockType === "cloudflare") {
+      return NextResponse.json({
+        date, venue, source: "stake", discovered: 0, races: [],
+        error: "cloudflare_blocked",
+        stakeUrl,
+        note:
+          "Stake is currently protected by Cloudflare bot detection, which blocks " +
+          "server-side requests. Open the Stake page directly in your browser to see " +
+          "RaceLab tips and live odds.",
+      })
+    }
+    if (blockType === "geo") {
+      return NextResponse.json({
+        date, venue, source: "stake", discovered: 0, races: [],
+        error: "geo_blocked",
+        stakeUrl,
+        note:
+          "Stake returned its geo-restricted page. The Vercel function may still be " +
+          "running from a US region. Ensure preferredRegion='hkg1' in stake/route.ts " +
+          "and redeploy.",
+      })
+    }
     return NextResponse.json({
       date, venue, source: "stake", discovered: 0, races: [],
-      error: geoBlocked ? "geo_blocked" : "no_meeting_found",
-      note: geoBlocked
-        ? "Stake returned its geo-restricted page, so this function is still running " +
-          "from a blocked region (e.g. the US). Set the Vercel function region to Hong " +
-          "Kong (hkg1): Project Settings → Functions → Region. The Hobby plan allows one " +
-          "region; the preferredRegion='hkg1' in code should also apply on redeploy."
-        : "No " + venue + " meeting found on Stake for " + date + ". The card may not be " +
-          "posted yet (Stake usually lists HK meetings the day before).",
+      error: "no_meeting_found",
+      stakeUrl,
+      note:
+        "No " + venue + " meeting found on Stake for " + date +
+        ". The card may not be posted yet — Stake usually lists HK meetings the day before.",
     })
   }
 
-  // 2) fetch + parse each race page, chunked to bound concurrency
+  // 3) Fetch + parse race pages
   const races: Race[] = []
   const chunkSize = 4
   for (let i = 0; i < links.length; i += chunkSize) {
@@ -303,5 +337,5 @@ export async function GET(request: NextRequest) {
   }
   races.sort((a, b) => a.raceNo - b.raceNo)
 
-  return NextResponse.json({ date, venue, source: "stake", discovered: links.length, races })
+  return NextResponse.json({ date, venue, source: "stake", discovered: links.length, races, stakeUrl })
 }
